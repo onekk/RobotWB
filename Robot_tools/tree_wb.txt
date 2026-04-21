@@ -1,0 +1,18 @@
+.
+├── freecad
+│   └── Robot_tools
+│       ├── create_robot_obj.py
+│       ├── init_gui.py
+│       ├── __init__.py
+│       ├── kdl
+│       │   ├── liborocos-kdl.so.1.5.4
+│       │   └── PyKDL.cpython-311-x86_64-linux-gnu.so
+│       ├── resources
+│       │   └── icons
+│       │       ├── rbt_createRobot.svg
+│       │       └── wb_logo.svg
+│       ├── tb_commands.py
+│       └── tb_locator.py
+└── tree_wb.txt
+
+7 directories, 19 files
