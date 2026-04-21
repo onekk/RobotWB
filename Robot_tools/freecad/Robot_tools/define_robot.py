@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.05"
-__build__ = "20260420_1239"
+__version__ = "0.06"
+__build__ = "20260421_1903"
 
 
 import sys
@@ -35,10 +35,10 @@ import PySide
 
 from PySide import QtGui, QtCore  # noqa  # QtWidgets
 from PySide.QtWidgets import (  # noqa
-    QApplication, QCheckBox, QGroupBox, QLabel, QLineEdit, QPlainTextEdit, QPushButton,
-    QSpinBox, QTabWidget, QTextEdit, QWidget,  # Widgets
+    QApplication, QCheckBox,  QFrame, QGroupBox, QLabel, QLineEdit, QPlainTextEdit,
+    QPushButton, QSpinBox, QTabWidget, QTextEdit, QWidget,  # Widgets
     QDialog, QFileDialog, QInputDialog, QMessageBox,  # Dialogs
-    QGridLayout, QVBoxLayout)  # Layouts
+    QGridLayout, QVBoxLayout, QSizePolicy)  # Layouts and Policy
 
 from PySide.QtCore import QObject, Qt  # noqa
 
@@ -56,6 +56,7 @@ v0.05 - Added actions needed when loading an asm doc:
          - check the asm document for "big errors" like the absence of Robot_FPO
            and Robot_Assembly object.
          - check for empty joints and signal it with a messagebox.
+v0.06 - added code to add joints (grounded).
 """
 
 fcl_err = App.Console.PrintError
@@ -255,6 +256,7 @@ def add_grounded(asm, obj):
     ground = joint_group.newObject("App::FeaturePython", "GroundedJoint")
     JointObject.GroundedJoint(ground, obj)
     JointObject.ViewProviderGroundedJoint(ground.ViewObject)
+    asm.recompute()
 
 
 def add_revolute(asm, j_lbl, plt1, plr1, plt2, plr2, ref1, ref2,
@@ -846,11 +848,30 @@ class O2PDialog(QDialog):
         ma_lay.addWidget(gb_bt, row, 0, 1, 4)
         row += 1
 
-        tp_gb0, tp_gb0l = cm_gbx(self, "tp_gb0", "GB1")
+        tp_gb0, tp_gb0l = cm_gbx(self, "tp_gb0", "")
         tp_gb0.setStyleSheet(self.grb_ss)
         # Empty groupBox
         tp_gb0.setLayout(tp_gb0l)
         ma_lay.addWidget(tp_gb0, row, 0, 1, 4)
+
+        row += 1
+        jn_gb0, jn_gb0l = cm_gbx(self, "jn_gb0", "Joints")
+        jn_gb0.setStyleSheet(self.grb_ss)
+
+        lbl_1_wd = cm_lbl(self, "lbl_jnspc0", "<b>Joint</b>", self.fnt, 0)
+        jn_gb0l.addWidget(lbl_1_wd, 0, 0, 1, 1)
+
+        lbl_2_wd = cm_lbl(self, "lbl_jnspc1", "<b>Type</b>", self.fnt, 0)
+        jn_gb0l.addWidget(lbl_2_wd, 0, 1, 1, 1)
+
+        lbl_3_wd = cm_lbl(self, "lbl_jnspc2", "<b>Face1</b>", self.fnt, 0)
+        jn_gb0l.addWidget(lbl_3_wd, 0, 2, 1, 1)
+
+        lbl_4_wd = cm_lbl(self, "lbl_jnspc3", "<b>Face2</b>", self.fnt, 0)
+        jn_gb0l.addWidget(lbl_4_wd, 0, 3, 1, 1)
+
+        jn_gb0.setLayout(jn_gb0l)
+        ma_lay.addWidget(jn_gb0, row, 0, 1, 4)
 
         row += 1
         ma_lay.setRowStretch(row, 1)
@@ -893,14 +914,6 @@ class O2PDialog(QDialog):
 
         lay.addWidget(js_gb0, row, 0, 1, 4)
 
-        row += 1
-        jn_gb0, jn_gb0l = cm_gbx(self, "jn_gb0", "Joints")
-        jn_gb0.setStyleSheet(self.grb_ss)
-        # Empty groupBox
-        jn_gb0.setLayout(jn_gb0l)
-        lay.addWidget(jn_gb0, row, 0, 1, 4)
-        #
-
     def lg_setui(self):
         """Populate Log Tab."""
         lg_lay = self.tabw.findChild(QObject, "l_lg")
@@ -937,6 +950,46 @@ class O2PDialog(QDialog):
         else:
             return None
 
+    def add_joint2ui(self, jpr, j_data):
+        """Add a joint to the panel.
+
+        Parameters:
+          jpr (int):  row number
+          j_data (list): joint column data (see in the code)
+
+        """
+        wid = self.findChild(QObject, "jn_gb0_wd")
+        lay = self.findChild(QObject, "jn_gb0_l")
+        #
+        # Data: [number, type, face1, face2]
+        lbl_jnt = cm_lbl(self, f"lbl_jnt{jpr}", str(j_data[0]), self.fnt, 0)
+        lbl_jnt.setFrameShape(QFrame.Shape.Panel)
+        lbl_jnt.setFrameShadow(QFrame.Shadow.Sunken)
+        lbl_jnt.setStyleSheet("QLabel {background-color: white;}")
+        lbl_jnt.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+        lay.addWidget(lbl_jnt, jpr, 0, 1, 1)
+
+        lbl_jt = cm_lbl(self, f"lbl_jt{jpr}", str(j_data[1]), self.fnt, 0)
+        lbl_jt.setFrameShape(QFrame.Shape.Panel)
+        lbl_jt.setFrameShadow(QFrame.Shadow.Sunken)
+        lbl_jt.setStyleSheet("QLabel {background-color: white;}")
+        lbl_jt.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+        lay.addWidget(lbl_jt, jpr, 1, 1, 1)
+
+        lbl_jf1 = cm_lbl(self, f"lbl_jf1{jpr}", str(j_data[2]), self.fnt, 0)
+        lbl_jf1.setFrameShape(QFrame.Shape.Panel)
+        lbl_jf1.setFrameShadow(QFrame.Shadow.Sunken)
+        lbl_jf1.setStyleSheet("QLabel {background-color: white;}")
+        lbl_jf1.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+        lay.addWidget(lbl_jf1, jpr, 2, 1, 1)
+
+        lbl_jf2 = cm_lbl(self, f"lbl_jf2{jpr}", str(j_data[3]), self.fnt, 0)
+        lbl_jf2.setFrameShape(QFrame.Shape.Panel)
+        lbl_jf2.setFrameShadow(QFrame.Shadow.Sunken)
+        lbl_jf2.setStyleSheet("QLabel {background-color: white;}")
+        lbl_jf2.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+        lay.addWidget(lbl_jf2, jpr, 3, 1, 1)
+
     # --------------------------------------------
     #                Model functions
     # --------------------------------------------
@@ -969,6 +1022,7 @@ class O2PDialog(QDialog):
                 return
             #
             self.check_asm()
+            setview(o_doc.Name)
 
     # --------------------------------------------
     #                Assembly functions
@@ -1094,8 +1148,18 @@ class O2PDialog(QDialog):
         # FIXME: it is rough guess see if there are alternatives.
         if len(self.wk_asm.Group) > 1:
             set_wid_en(self, ("btn_add_jnt",), True)
+            # NOTE: no need to activate the "Load STEP" button as the Document
+            # with robot components will be opened by FreeCAD for us.
         else:
             set_wid_en(self, ("btn_add_jnt", "btn_load_step"), True)
+
+        if ojl > 0:
+            print(f"obj: {ojl}")
+
+        # TODO: In case of already present joints, we must:
+        # 1) alter here jnt_ec value
+        # 2) populate the already defined joints
+        # 3) if grounded joint is already defined, we must disbale the checkbox?
 
         return
 
@@ -1105,14 +1169,40 @@ class O2PDialog(QDialog):
 
     def add_jnt2asm(self):
         """Add a joint to the assembly and the FPO."""
-        fcl_msg(f"Joint meta: {self.jnt_meta}")
-        pass
-        # FIXME: add the following things:
+        fcl_msg(f"Joint meta: {self.jnt_meta}\n")
+        # NOTE: correct sequence:
         # 1) validate the sequence
         # 2) reset the face counter to 1
         # 3) reset the jnt_meta dic to empty
         # 4) advance jnt_ec by 1
         # 5) set buttons Select Face1 and Select Face2 state
+        dks = list(self.jnt_meta)
+        jn = int(dks[0][5:7])
+        jf = int(dks[0][7:9])
+        jid0 = self.jnt_meta[dks[0]]
+        if len(dks) == 1:
+            fcl_msg(f"Joint number {jn} Face {jf} jid: {jid0}\n")
+            # one face selected, so the joint is probably the grounded one.
+            if jn == 0:
+                # This is probably a grounded joint as it is logically the first
+                # to be set.
+                jnt_fc1_onm = jid0['ob_nm']
+                jnt_fc1_se = jid0['sub_el'][0]
+                jnt_obj = self.wk_asm.getObject(jnt_fc1_onm)
+                add_grounded(self.wk_asm, jnt_obj)
+                self.wk_asm.recompute()
+                # Reset the interface
+                set_wid_en(self, ("btn_jnt_s1",), True)
+                set_wid_en(self, ("chb_sgj",), False)
+                # TODO: populate the joint frame with a joint type.
+                self.add_joint2ui(jn + 2, [0, "grounded", jnt_fc1_se, "--"])
+                # advance joint counter and reset face counter and data dict
+                self.jnt_ec += 1
+                self.jnt_fc = 1
+                self.jnt_meta = {}
+            else:
+                # Emit an error as two faces are needed
+                return
 
         # NOTE: following code is to add the joint to the ASM
         # add_grounded(asm, base_obj)
