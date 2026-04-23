@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.07"
-__build__ = "20260422_1307"
+__version__ = "0.08"
+__build__ = "20260423_1642"
 
 
 import sys
@@ -58,6 +58,7 @@ v0.05 - Added actions needed when loading an asm doc:
          - check for empty joints and signal it with a messagebox.
 v0.06 - added code to add joints (grounded).
 v0.07 - improved check_asm
+v0.08 - solved 'Linked Part container' selection quirk
 """
 
 fcl_err = App.Console.PrintError
@@ -1173,14 +1174,14 @@ class O2PDialog(QDialog):
             # NOTE: use of the flag as at this point the ui is not yet created.
             self.flags["chb_gdj"] = False
             self.add_joint2ui(self.jnt_ec + 1, [0, "grounded", "--", "--"])
- 
+
         # Check if assembly object has only a Joint group on it
         # checking Group property length > 1 will tell if there are other
         # objects
         # FIXME: it is rough guess see if there are alternatives.
         if len(self.wk_asm.Group) > 1:
             pass
-            # set_wid_en(self, ("btn_add_jnt",), True)  # 
+            # set_wid_en(self, ("btn_add_jnt",), True)  #
             # NOTE: no need to activate the "Load STEP" button as the Document
             # with robot components will be opened by FreeCAD for us.
         else:
@@ -1218,6 +1219,7 @@ class O2PDialog(QDialog):
         jmo0 = self.jnt_meta[dks[0]]
         jnt_fc1_onm = jmo0['ob_nm']
         jnt_fc1_obj = self.wk_asm.getObject(jnt_fc1_onm)
+        jnt_fc1_oref = jmo0['ob_ref']
 
         if dbg_s:
             fcl_msg(f"Joint number {jn} Face {jf1} jid: {jmo0}\n")
@@ -1251,6 +1253,7 @@ class O2PDialog(QDialog):
         jmo1 = self.jnt_meta[dks[1]]
         jnt_fc2_onm = jmo1['ob_nm']
         jnt_fc2_obj = self.wk_asm.getObject(jnt_fc2_onm)
+        jnt_fc2_oref = jmo1['ob_ref']
         #
         if dbg_s:
             fcl_msg(f"Joint number {jn} Face {jf2} jmo1: {jmo1}\n")
@@ -1261,6 +1264,30 @@ class O2PDialog(QDialog):
                 fcl_msg(f"-- f2 obj Label: {jnt_fc2_obj.Label}\n")
                 fcl_msg(f"-- f2 obj Label2: {jnt_fc2_obj.Label2}\n")
 
+            # NOTE: we must use a conventional Label or Label2 composed as follow:
+            #  rb_jntXX (robot joint) X is an integer it will permit 99 joints
+            # ee_jntXX (end effector) same as above
+            #
+            # this way we could sort out using Label or Label2 immediately
+            # the joint type as there is no way to distinguish them by Name
+            # alternatively we could plan as example
+            # rb_ro_jnt the added _ro_ will mean rotation but could also be
+            # sl = sliding, or pr = prismatic. Let me know
+
+            # rev1 = add_revolute(
+            #     self.wk_asm, f"rb_jnt{jn:02d}",  # OK asm, j_lbl
+            #     V3(0.0, 317.0, 0.0), Rotation(*[0.0, 0.0, -90.0]),  # plt1, plr1 TO FILL
+            #     V3(0.0, 317.0, 0.0), Rotation(*[180.0, 0.0, 90.0]),  # plt2, plr2 TO FILL
+            #     [jnt_fc1_obj, [jnt_fc1_oref, jnt_fc1_oref]],  # ref1 OK
+            #     [jnt_fc2_obj, [jnt_fc2_oref, jnt_fc2_oref]],  # ref2 OK
+            #     Placement(VEC0, Rotation(180, 0, 0)),  # ofs1 TO FILL
+            #     Placement(VEC0, ROT0) # ofs2 OK
+            # )
+            # NOTE: in the example code above we should derive the:
+            # Placement1 composed by plr1, and plt1 (second line)
+            # Placement2 compose by plr2, plt2 (Third line)
+            # Offset1 ofs1
+            # and Offset2 ofs2 (but probably it should be enpty )
         else:
             if dbg_s:
                 fcl_msg(f"-- f2 obj not found: {jnt_fc2_obj}\n")
@@ -1306,22 +1333,55 @@ class O2PDialog(QDialog):
         elif esn == 1:
             s0 = raw_sel[0]
             obj = s0.Object
+            obj_nm = obj.Name
             sub_ent = s0.SubElementNames
             obj_typ = obj.TypeId
-            # obj_il = obj.InList
+            obj_par = obj.Parents
             fcl_msg((
                 f"Selection: {s0}\n"
-                f"Obj Name: {obj.Name}\n"
+                f"Obj Name: {obj_nm}\n"
                 f"Obj Label: {obj.Label}\n"
                 f"Obj Type: {obj_typ}\n"
-                # f"Obj InList: {obj_il}\n"
+                f"Obj Parents: {obj_par}\n"
                 f"Obj SubElements: {sub_ent}\n"
             )
             )
+            # NOTE: try to determine if the object.Name exist in the Assembly doc
+            #       if the object is not existent it is probably in a
+            #       "Linked Part container"
+            # FIXME: probably an hack!
+            sobj_nm = ""
+            s_obj_ref = ""
+            #
+            sc_obj = self.wk_asm.getObject(obj_nm)
+            if sc_obj is None:
+                obj_plen = len(obj.Parents)
+
+                # double check just in case hack is not correct
+                if obj_plen > 1:
+                    found = False
+                    for c_obj in obj_par:
+                        as_obj = c_obj[0]
+                        as_ref = c_obj[1]
+                        as_refc = as_ref.split('.')
+                        as_typ = as_obj.TypeId
+                        fcl_msg(f"as_typ: {as_typ}\n")
+                        if as_typ == "Assembly::AssemblyObject":
+                            sobj_nm = as_refc[0]
+                            s_obj_ref = f"{as_refc[1]}.{sub_ent[0]}"
+                            found = True
+                        if found:
+                            break
+            else:
+                sobj_nm = obj_nm
+                s_obj_ref = sub_ent[0]
+
+            # TODO: add a check in case of no match?
+
             jnt_elnm = f"joint{self.jnt_ec:02d}{self.jnt_fc:02d}"
             self.jnt_meta[jnt_elnm] = {}
-            self.jnt_meta[jnt_elnm]["ob_nm"] = obj.Name
-            self.jnt_meta[jnt_elnm]["sub_el"] = sub_ent
+            self.jnt_meta[jnt_elnm]["ob_nm"] = sobj_nm
+            self.jnt_meta[jnt_elnm]["obj_ref"] = s_obj_ref
             #
             if self.jnt_fc == 1:
                 self.jnt_fc = 2
