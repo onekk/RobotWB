@@ -9,7 +9,7 @@ Copyright: 2026
 Licence: All right reserved
 """
 __version__ = "0.08"
-__build__ = "20260423_1642"
+__build__ = "20260423_1655"
 
 
 import sys
@@ -1381,7 +1381,7 @@ class O2PDialog(QDialog):
             jnt_elnm = f"joint{self.jnt_ec:02d}{self.jnt_fc:02d}"
             self.jnt_meta[jnt_elnm] = {}
             self.jnt_meta[jnt_elnm]["ob_nm"] = sobj_nm
-            self.jnt_meta[jnt_elnm]["obj_ref"] = s_obj_ref
+            self.jnt_meta[jnt_elnm]["ob_ref"] = s_obj_ref
             #
             if self.jnt_fc == 1:
                 self.jnt_fc = 2
