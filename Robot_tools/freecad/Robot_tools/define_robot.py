@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.08"
-__build__ = "20260423_1655"
+__version__ = "0.09"
+__build__ = "20260424_1057"
 
 
 import sys
@@ -57,8 +57,9 @@ v0.05 - Added actions needed when loading an asm doc:
            and Robot_Assembly object.
          - check for empty joints and signal it with a messagebox.
 v0.06 - added code to add joints (grounded).
-v0.07 - improved check_asm
-v0.08 - solved 'Linked Part container' selection quirk
+v0.07 - improved check_asm.
+v0.08 - solved 'Linked Part container' selection quirk.
+v0.09 - added code to add revolute joint.
 """
 
 fcl_err = App.Console.PrintError
@@ -261,33 +262,33 @@ def add_grounded(asm, obj):
     asm.recompute()
 
 
-def add_revolute(asm, j_lbl, plt1, plr1, plt2, plr2, ref1, ref2,
-                 ofs1=Placement(VEC0, ROT0), ofs2=Placement(VEC0, ROT0)):
-    """Add the grounded object."""
+def add_revolute(asm, j_refs, j_lbl, dbg_s=False):
+    """Add a revolute joint."""
     joint_group = UtilsAssembly.getJointGroup(asm)
-    rev_j = joint_group.newObject("App::FeaturePython", "RevoluteJoint")
-    JointObject.Joint(rev_j, 1)
-    JointObject.ViewProviderJoint(rev_j.ViewObject)
-    rev_j.recompute()
-    rev_j.Detach1 = False
-    rev_j.Detach2 = False
-    rev_j.EnableAngleMax = False
-    rev_j.EnableAngleMin = False
-    rev_j.EnableLengthMax = False
-    rev_j.EnableLengthMin = False
-    rev_j.JointType = "Revolute"
-    rev_j.Label = j_lbl
-    rev_j.Label2 = ""
-    rev_j.Offset1 = ofs1
-    rev_j.Offset2 = ofs2
-    rev_j.Placement1 = Placement(plt1, plr1)
-    rev_j.Placement2 = Placement(plt2, plr2)
-    rev_j.Reference1 = ref1
-    rev_j.Reference2 = ref2
-    rev_j.Suppressed = False
-    rev_j.Visibility = False
-    rev_j.recompute()
-    return rev_j
+    revj = joint_group.newObject("App::FeaturePython", "RevoluteJoint")
+    revj.Label2 = j_lbl
+    a_jnt = JointObject.Joint(revj, 1)
+    JointObject.ViewProviderJoint(revj.ViewObject)
+    #
+    revj.Reference1 = j_refs[0]
+    revj.Reference2 = j_refs[1]
+
+    revj.recompute()
+    asm.recompute()
+    #
+    pl1 = a_jnt.findPlacement(revj, revj.Reference1, 0)
+    pl2 = a_jnt.findPlacement(revj, revj.Reference2, 0)
+    #
+    if dbg_s:
+        fcl_msg((
+            f"Reference1: {pl1}\n"
+            f"Reference2: {pl2}\n")
+        )
+    #
+    revj.recompute()
+    asm.recompute()
+
+    return revj
 
 
 def create_assembly(doc):
@@ -1188,7 +1189,29 @@ class O2PDialog(QDialog):
             set_wid_en(self, ("btn_load_step",), True)
 
         if ojl > 0:
-            print(f"obj: {ojl}")
+            self.jnt_ec += ojl
+            for jn_idx, joint in enumerate(self.wk_asm.Joints):
+                jnt_lb2 = joint.Label2
+                jnt_typ = joint.JointType
+                jnt_ref1 = joint.Reference1
+                jnt_ref2 = joint.Reference2
+                # NOTE: eventually tune the dbg output
+                if dbg_s:
+                    fcl_msg((
+                        f" -- Joint Number > {jn_idx}\n"
+                        f" -- Joint Name > {joint.Name}\n"
+                        f" -- Joint Label > {joint.Label}\n"
+                        f" -- Joint Label2 > {jnt_lb2}\n"
+                        f" -- Joint TypeId > {jnt_typ}\n"
+                        f" -- Joint Reference1 > {jnt_ref1}\n"
+                        f" -- Joint Reference2 > {jnt_ref2}\n"
+                        )
+                    )
+                if jnt_lb2[:6] == "rb_jnt":
+                    jr1l = f"{jnt_ref1[0].Name}.{jnt_ref1[1][0]}"
+                    jr2l = f"{jnt_ref2[0].Name}.{jnt_ref2[1][0]}"
+                    self.add_joint2ui(
+                        jn_idx + 3, [jn_idx + 1, jnt_typ, jr1l, jr2l])
 
         # TODO: In case of already present joints, we must:
         # 1) alter here jnt_ec value
@@ -1223,9 +1246,12 @@ class O2PDialog(QDialog):
 
         if dbg_s:
             fcl_msg(f"Joint number {jn} Face {jf1} jid: {jmo0}\n")
-            fcl_msg(f"-- f1 obj name: {jnt_fc1_onm}\n")
-            fcl_msg(f"-- f1 obj Label: {jnt_fc1_obj.Label}\n")
-            fcl_msg(f"-- f1 obj Label2: {jnt_fc1_obj.Label2}\n")
+            fcl_msg((
+                f"-- f1 obj name: {jnt_fc1_onm}\n"
+                f"-- f1 obj ref: {jnt_fc1_oref}\n"
+                f"-- f1 obj Label: {jnt_fc1_obj.Label}\n"
+                f"-- f1 obj Label2: {jnt_fc1_obj.Label2}\n")
+            )
 
         if len(dks) == 1:
             # one face selected, so the joint is probably the grounded one.
@@ -1256,59 +1282,42 @@ class O2PDialog(QDialog):
         jnt_fc2_oref = jmo1['ob_ref']
         #
         if dbg_s:
-            fcl_msg(f"Joint number {jn} Face {jf2} jmo1: {jmo1}\n")
-            fcl_msg(f"-- f1 obj Name: {jnt_fc2_onm}\n")
+            fcl_msg((
+                f"Joint number {jn} Face {jf2} jmo1: {jmo1}\n"
+                f"-- f2 obj name: {jnt_fc2_onm}\n"
+                f"-- f2 obj ref: {jnt_fc2_oref}\n")
+            )
         #
         if jnt_fc2_obj is not None:
             if dbg_s:
                 fcl_msg(f"-- f2 obj Label: {jnt_fc2_obj.Label}\n")
                 fcl_msg(f"-- f2 obj Label2: {jnt_fc2_obj.Label2}\n")
 
-            # NOTE: we must use a conventional Label or Label2 composed as follow:
+            # NOTE: we must use a conventional Label2 composed as follow:
             #  rb_jntXX (robot joint) X is an integer it will permit 99 joints
             # ee_jntXX (end effector) same as above
             #
-            # this way we could sort out using Label or Label2 immediately
+            # this way we could sort out using Label2 immediately
             # the joint type as there is no way to distinguish them by Name
             # alternatively we could plan as example
             # rb_ro_jnt the added _ro_ will mean rotation but could also be
             # sl = sliding, or pr = prismatic. Let me know
 
-            # rev1 = add_revolute(
-            #     self.wk_asm, f"rb_jnt{jn:02d}",  # OK asm, j_lbl
-            #     V3(0.0, 317.0, 0.0), Rotation(*[0.0, 0.0, -90.0]),  # plt1, plr1 TO FILL
-            #     V3(0.0, 317.0, 0.0), Rotation(*[180.0, 0.0, 90.0]),  # plt2, plr2 TO FILL
-            #     [jnt_fc1_obj, [jnt_fc1_oref, jnt_fc1_oref]],  # ref1 OK
-            #     [jnt_fc2_obj, [jnt_fc2_oref, jnt_fc2_oref]],  # ref2 OK
-            #     Placement(VEC0, Rotation(180, 0, 0)),  # ofs1 TO FILL
-            #     Placement(VEC0, ROT0) # ofs2 OK
-            # )
-            # NOTE: in the example code above we should derive the:
-            # Placement1 composed by plr1, and plt1 (second line)
-            # Placement2 compose by plr2, plt2 (Third line)
-            # Offset1 ofs1
-            # and Offset2 ofs2 (but probably it should be enpty )
+            j_lbl = f"rb_jnt{self.jnt_ec:02d}"  # see note above
+            j_ref1 = [jnt_fc1_oref, jnt_fc1_oref]
+            j_ref2 = [jnt_fc2_oref, jnt_fc2_oref]
+
+            add_revolute(
+                self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)], j_lbl)
+            self.wk_asm.recompute()
+            jr1l = f"{jnt_fc1_obj.Name}.{jnt_fc1_oref}"
+            jr2l = f"{jnt_fc2_obj.Name}.{jnt_fc2_oref}"
+            self.add_joint2ui(jn + 2, [0, "revolute", jr1l, jr2l])
         else:
             if dbg_s:
                 fcl_msg(f"-- f2 obj not found: {jnt_fc2_obj}\n")
             # emit an error?
             pass
-
-        # NOTE: following code is to add the joint to the ASM
-        # add_grounded(asm, base_obj)
-        # base_obj.recompute()
-
-        # rev1 = add_revolute(
-        #     asm, "Revolute001",
-        #     V3(0.0, 317.0, 0.0), Rotation(*[0.0, 0.0, -90.0]),
-        #     V3(0.0, 317.0, 0.0), Rotation(*[180.0, 0.0, 90.0]),
-        #     [jnt1_obj, ['Face1977', 'Face1977']],
-        #     [base_obj, ['Face792', 'Face792']],
-        #     Placement(VEC0, Rotation(180, 0, 0)),
-        #     Placement(VEC0, ROT0)
-        # )
-
-        # rev1.recompute()
 
     def select_face(self, dbg_s=False):
         """Select Face."""
