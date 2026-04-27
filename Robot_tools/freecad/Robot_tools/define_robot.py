@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.09"
-__build__ = "20260424_1057"
+__version__ = "0.10"
+__build__ = "20260427_1644"
 
 
 import sys
@@ -60,6 +60,7 @@ v0.06 - added code to add joints (grounded).
 v0.07 - improved check_asm.
 v0.08 - solved 'Linked Part container' selection quirk.
 v0.09 - added code to add revolute joint.
+v0.10 - added code to correctly populate Robot_FPO
 """
 
 fcl_err = App.Console.PrintError
@@ -1307,9 +1308,10 @@ class O2PDialog(QDialog):
             j_ref1 = [jnt_fc1_oref, jnt_fc1_oref]
             j_ref2 = [jnt_fc2_oref, jnt_fc2_oref]
 
-            add_revolute(
+            revj = add_revolute(
                 self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)], j_lbl)
             self.wk_asm.recompute()
+            self.add_link2FPO(revj)
             jr1l = f"{jnt_fc1_obj.Name}.{jnt_fc1_oref}"
             jr2l = f"{jnt_fc2_obj.Name}.{jnt_fc2_oref}"
             self.add_joint2ui(jn + 2, [0, "revolute", jr1l, jr2l])
@@ -1318,6 +1320,17 @@ class O2PDialog(QDialog):
                 fcl_msg(f"-- f2 obj not found: {jnt_fc2_obj}\n")
             # emit an error?
             pass
+
+    def add_link2FPO(self, joint):
+        """Add the joint to the FPO."""
+        link_cont = self.rob_obj.Robot_joints
+        link_cont.append(joint)
+        self.rob_obj.Robot_joints = link_cont
+        #
+        # Add the rotation dir data
+        dir_cont = self.rob_obj.Robot_joints_dir
+        dir_cont.append(1)
+        self.rob_obj.Robot_joints_dir = dir_cont
 
     def select_face(self, dbg_s=False):
         """Select Face."""

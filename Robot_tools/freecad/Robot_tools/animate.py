@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.05"
-__build__ = "20260411_1919"
+__version__ = "0.06"
+__build__ = "20260427_1622"
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -36,6 +36,7 @@ v0.03 - added direction field from FPO.
 v0.04 - some improvements.
 v0.05 - reworked 'Reload FPO Data' button to avoid unknown problem that causes
         a buggy  movement commands (it don't honour the steps)
+v0.06 - starting to adapt to the robot_FPO
 """
 
 fcl_err = App.Console.PrintError
