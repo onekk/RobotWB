@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.10"
-__build__ = "20260427_1644"
+__version__ = "0.11"
+__build__ = "20260427_1928"
 
 
 import sys
@@ -60,7 +60,8 @@ v0.06 - added code to add joints (grounded).
 v0.07 - improved check_asm.
 v0.08 - solved 'Linked Part container' selection quirk.
 v0.09 - added code to add revolute joint.
-v0.10 - added code to correctly populate Robot_FPO
+v0.10 - added code to correctly populate Robot_FPO.
+v0.11 - some fix in add joints logic.
 """
 
 fcl_err = App.Console.PrintError
@@ -1231,12 +1232,6 @@ class O2PDialog(QDialog):
         if dbg_s:
             fcl_msg(f"Joint meta: {self.jnt_meta}\n")
 
-        # NOTE: correct sequence:
-        # 1) validate the sequence
-        # 2) reset the face counter to 1
-        # 3) reset the jnt_meta dic to empty
-        # 4) advance jnt_ec by 1
-        # 5) set buttons Select Face1 and Select Face2 state
         dks = list(self.jnt_meta)
         jn = int(dks[0][5:7])
         jf1 = int(dks[0][7:9])
@@ -1290,6 +1285,8 @@ class O2PDialog(QDialog):
             )
         #
         if jnt_fc2_obj is not None:
+            # NOTE: operations sequence:
+            # 1) validate the sequence
             if dbg_s:
                 fcl_msg(f"-- f2 obj Label: {jnt_fc2_obj.Label}\n")
                 fcl_msg(f"-- f2 obj Label2: {jnt_fc2_obj.Label2}\n")
@@ -1315,6 +1312,12 @@ class O2PDialog(QDialog):
             jr1l = f"{jnt_fc1_obj.Name}.{jnt_fc1_oref}"
             jr2l = f"{jnt_fc2_obj.Name}.{jnt_fc2_oref}"
             self.add_joint2ui(jn + 2, [0, "revolute", jr1l, jr2l])
+            # advance joint counter and reset face counter and data dict
+            self.jnt_ec += 1
+            self.jnt_fc = 1
+            self.jnt_meta = {}
+            set_wid_en(self, ("btn_jnt_s1",), True)
+            set_wid_en(self, ("btn_jnt_s2",), False)
         else:
             if dbg_s:
                 fcl_msg(f"-- f2 obj not found: {jnt_fc2_obj}\n")
@@ -1334,13 +1337,10 @@ class O2PDialog(QDialog):
 
     def select_face(self, dbg_s=False):
         """Select Face."""
-        dbg_s = True  # DBG
+        # dbg_s = True  # DBG
         if dbg_s:
             fcl_msg(f"Select Face{self.jnt_fc}\n")
-        # FIXME: getSelectionEx() seems not to work correctly with elements
-        #        contained in "Part container". InList seems to not help here
-        #        we must check the selection to obtain the Part Container Name
-
+        #
         raw_sel = Gui.Selection.getSelectionEx()
         #
         if dbg_s:

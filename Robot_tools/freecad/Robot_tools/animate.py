@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.06"
-__build__ = "20260427_1622"
+__version__ = "0.07"
+__build__ = "20260427_1928"
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -37,6 +37,8 @@ v0.04 - some improvements.
 v0.05 - reworked 'Reload FPO Data' button to avoid unknown problem that causes
         a buggy  movement commands (it don't honour the steps)
 v0.06 - starting to adapt to the robot_FPO
+v0.07 - some hacks to reset the touched overlay icon. Added a check of joints dir
+        data, to avoid initialization error.
 """
 
 fcl_err = App.Console.PrintError
@@ -579,7 +581,8 @@ class O2PDialog(QDialog):
             # fcl_msg(f"Object Name: {obj.Name[:9]}\n")
             if obj_typ == "App::FeaturePython" and obj.Name[:9] == "Robot_FPO":
                 # fcl_msg("Robot OBJ OK\n")
-                lbl_rob_id = cm_lbl(self, "lbl_rob_id", f"<b>{obj.Name}</b>", self.fnt, 0)
+                lbl_rob_id = cm_lbl(
+                    self, "lbl_rob_id", f"<b>{obj.Name}</b>", self.fnt, 0)
                 self.form_lay.addWidget(lbl_rob_id, row, 0, 1, 4)
                 row += 1
                 self.rob_obj = obj
@@ -758,7 +761,14 @@ class O2PDialog(QDialog):
             fcl_msg(f"{j_n} {jnt.Label}\n")
             fcl_msg(f"OF2:  {jnt_o2}\n")
             jnt.Offset2 = Placement(VEC0, Rotation())
+            # FIXME: maybe a dirty hack but it seems to reset the overlay icon.
+            jnt.purgeTouched()
+            jnt.ViewObject.signalChangeIcon()
+            # NOTE: following recompute seems to not work.
             asm_obj.recompute()
+            # FIXME: maybe a dirty hack but it seems to reset the overlay icon.
+            asm_obj.purgeTouched()
+            asm_obj.ViewObject.signalChangeIcon()
             obj = getObjByName(wid, fl_nm)
             fcl_msg(f"Field name: {fl_nm}, obj: {obj}\n")  # DBG
             obj.setText(str(0.0))
@@ -806,21 +816,23 @@ class O2PDialog(QDialog):
         else:
             obj = self.rob_obj.Robot_assembly
             setview(obj.Document.Name, 1)
-            jnt_nm = len(self.rob_obj.Robot_joints)
-            if jnt_nm < 1:
+            jnt_n = len(self.rob_obj.Robot_joints)
+            jntd_n = len(self.rob_obj.Robot_joints_dir)
+        
+            if jnt_n < 1:
                 msg_box(
                     self, "Robot", self.fnt,
                     "<b>Robot</b><br><br>You must select a complete Robot Object")
                 return
             if dbg_s:
-                fcl_msg(f"Joint numbers: {jnt_nm}\n")
-            self.j_num = jnt_nm
+                fcl_msg(f"Joint numbers: {jnt_n}\n")
+            self.j_num = jnt_n
             self.j_dirs = []
             self.j_nms = []
             self.j_step = []
             self.j_vals = []
             #
-            for n in range(jnt_nm):
+            for n in range(jnt_n):
                 jnt_n = n + 1
                 self.j_nms.append(f"Joint{jnt_n:02d}")
                 self.j_vals.append(0.0)
@@ -833,11 +845,34 @@ class O2PDialog(QDialog):
                  f"{self.rob_obj.Name} lacks of a proper <b>Robot_joints_dir</b>"
                  "<br><br>It will be populated with a 'list' "))
             dummy_lst = []
-            for n in range(jnt_nm):
+            for n in range(jnt_n):
                 dummy_lst.append(1)
             #
             self.rob_obj.Robot_joints_dir = dummy_lst
-        #
+
+        if jntd_n > jnt_n:
+            msg_box(
+                self, "Robot", self.fnt,
+                ("<b>WARNING</b><br><br>"
+                 f"{self.rob_obj.Name} <b>Robot_joints_dir</b> was not "
+                 "correctly populated.<br><br>There were too much data "
+                 "in the 'list', it has been fixed now! <br><br>"
+                 "<b>Check rotation sense correctness of each joint!</b>"))
+            jntd_l = self.rob_obj.Robot_joints_dir
+            self.rob_obj.Robot_joints_dir = jntd_l[:jnt_n]
+        elif jntd_n < jnt_n:
+            msg_box(
+                self, "Robot", self.fnt,
+                ("<b>WARNING</b><br><br>"
+                 f"{self.rob_obj.Name} <b>Robot_joints_dir</b> was not "
+                 "correctly populated.<br><br>There were too few data "
+                 "in the 'list', it has been fixed now! <br><br>"
+                 "<b>Check rotation sense correctness of each joint!</b>"))
+            jntd_l = self.rob_obj.Robot_joints_dir
+            for n in range(jnt_n - jntd_n):
+                jntd_l.append(1)
+            self.rob_obj.Robot_joints_dir = jntd_l
+            #
         self.j_dirs = self.rob_obj.Robot_joints_dir
 
     def setJointAngle(self, j_idx, value, dbg_s=False):
@@ -849,6 +884,11 @@ class O2PDialog(QDialog):
         #
         joint.Offset2 = Placement(VEC0, Rotation(value, 0, 0))
         joint.recompute()
+        # FIXME: maybe a dirty hack but it seems to reset the overlay icon.
+        joint.purgeTouched()
+        joint.ViewObject.signalChangeIcon()
+        # not fully functional here
+        # self.wk_asm.recompute()
         if dbg_s:
             fcl_msg(f"Offset2: {prev_ofs} >> {joint.Offset2}\n")
 
