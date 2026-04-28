@@ -1,6 +1,6 @@
-"""Robot Test.
+"""Robot Testbed.
 
-Name: study_asm.py
+Name: define_robot.py
 
 See Changelog below.
 
@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.11"
-__build__ = "20260427_1928"
+__version__ = "0.12"
+__build__ = "20260428_1225"
 
 
 import sys
@@ -42,6 +42,7 @@ from PySide.QtWidgets import (  # noqa
 
 from PySide.QtCore import QObject, Qt  # noqa
 
+# from freecad.Robot_test.rbt_objects import Robot_obj, ViewProviderRBo
 from freecad.Robot_tools.rbt_objects import Robot_obj, ViewProviderRBo
 
 """
@@ -53,15 +54,17 @@ v0.02 - Added create_asm code.
 v0.03 - Added add joint action (unfinished).
 v0.04 - Added some refinement in UI and various.
 v0.05 - Added actions needed when loading an asm doc:
-         - check the asm document for "big errors" like the absence of Robot_FPO
+         - Check the asm document for "big errors" like the absence of Robot_FPO
            and Robot_Assembly object.
-         - check for empty joints and signal it with a messagebox.
-v0.06 - added code to add joints (grounded).
-v0.07 - improved check_asm.
-v0.08 - solved 'Linked Part container' selection quirk.
-v0.09 - added code to add revolute joint.
-v0.10 - added code to correctly populate Robot_FPO.
-v0.11 - some fix in add joints logic.
+         - Check for empty joints and signal it with a messagebox.
+v0.06 - Added code to add joints (grounded).
+v0.07 - Improved check_asm.
+v0.08 - Solved 'Linked Part container' selection quirk.
+v0.09 - Added code to add revolute joint.
+v0.10 - Added code to correctly populate Robot_FPO.
+v0.11 - Some fix in add joints logic.
+v0.12 - Updated to be used also in robot_test.
+      - Message boxes fixed to show program name and the context.
 """
 
 fcl_err = App.Console.PrintError
@@ -70,6 +73,13 @@ fcl_warn = App.Console.PrintWarning
 
 mdtsp = "%y%m%d_%H%M"
 MODULE_PATH = pathlib.Path(__file__).parent
+
+if str(MODULE_PATH) == "Robot_test":
+    pg_name = "Robot test"
+    fcl_msg("Running on Robot Test")
+else:
+    pg_name = "Robot Tools"
+    fcl_msg("Running on Robot Tools")
 
 V3 = App.Vector
 Rotation = App.Rotation
@@ -492,7 +502,9 @@ def get_dir(parent, fnt, pre_dir=""):
         f_nms = cf_dia.selectedFiles()
         if len(f_nms) != 1:
             msg_box(
-                parent, "You must select only one file.", fnt, "w", 'WARNING:', "w")
+                parent, " ", fnt,
+                (f"<b>{pg_name}</b><br><br>You must select only one file."),
+                'WARNING:', "w")
             f_name = None
         else:
             f_name = f_nms[0]
@@ -525,7 +537,9 @@ def get_file(parent, fnt, ftype="fcstd", pre_dir=""):
         f_nms = cf_dia.selectedFiles()
         if len(f_nms) != 1:
             msg_box(
-                parent, "You must select only one file.", fnt, "w", 'WARNING:', "w")
+                parent, " ", fnt,
+                (f"<b>{pg_name}</b><br><br>You must select only one file."),
+                'WARNING:', "w")
         else:
             f_name = f_nms[0]
 
@@ -725,7 +739,7 @@ class O2PDialog(QDialog):
         y_loc = (av_hei - w_hei) * 0.5
         # define window xLoc,yLoc,xDim,yDim
         self.setGeometry(x_loc, y_loc, w_wid, w_hei)
-        self.setWindowTitle(self.ui_title)
+        self.setWindowTitle(" ")  # MacOS has no title in some cases
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowStaysOnTopHint
         )
@@ -735,7 +749,8 @@ class O2PDialog(QDialog):
         self.lb_em = round(lb_fm.maxWidth())
 
         # Determine if we are running as a module of Robot Tools WB/TB
-        if str(MODULE_PATH.stem) == 'Robot_tools':
+        mps = str(MODULE_PATH.stem)
+        if mps == 'Robot_tools' or mps == 'Robot_test':
             self.isWBcomp = True
         else:
             self.isWBcomp = False
@@ -757,7 +772,9 @@ class O2PDialog(QDialog):
 
         mcn = 4  # fake number of column to pre adapt panel width
         row = 0
-        self.lbl_sw = cm_lbl(self, "lbl_sw", f"Build: {__build__}", self.fnt, 2)
+        self.lbl_sw = cm_lbl(
+            self, "lbl_sw",
+            f"<b>{pg_name} - {self.ui_title}</b> - Build: {__build__}", self.fnt, 0)
         self.dmw_lay.addWidget(self.lbl_sw, row, 0, 1, mcn)
 
         row += 1
@@ -850,7 +867,7 @@ class O2PDialog(QDialog):
 
         # btn_add_jnt.clicked.connect(self.act_add_joint)
 
-        # ma_lay.addWidget(gb_bt, row, 0, 1, 4)
+        ma_lay.addWidget(gb_bt, row, 0, 1, 4)
 
         row += 1
 
@@ -1106,9 +1123,10 @@ class O2PDialog(QDialog):
             pass
         else:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                ("<b>There are no Robot Assembly definitions in the document</b>"
-                 "<br><br> You must select a correct document or create one"))
+                self, " ", self.fnt,
+                (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                 "There are no Robot Assembly  definitions in the document.<br>"
+                 "You must select a correct document or create one"))
             # FIXME: See if the activation of Create ASM button is correct here.
             set_wid_en(self, ("btn_cre_asm",), True)
             return
@@ -1117,10 +1135,10 @@ class O2PDialog(QDialog):
             self.wk_asm = asm_objs[0]
         else:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                (f"<b>There are: [{ran}] Robot Assembly objects "
-                 "in the document</b><br><br>"
-                 "You must select one"))
+                self, " ", self.fnt,
+                (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                 f"<b>There are: [{ran}] Robot Assembly objects in the document"
+                 "</b><br><br>You must select one"))
             # TODO: add the corresponding selection dialog.
             return
 
@@ -1131,15 +1149,17 @@ class O2PDialog(QDialog):
                 self.rob_obj = rob_objs[0]
             else:
                 msg_box(
-                    self, "Robot_tools", self.fnt,
-                    (f"<b>There are: [{ron}] FPO in the assembly</b><br><br>"
+                    self, " ", self.fnt,
+                    (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                     f"<b>There are: [{ron}] FPO in the assembly</b><br><br>"
                      "You must select the working one"))
                 # TODO: create the selection dialog
                 return
         else:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                ("<b>There are no Robot FPO in the assembly</b><br><br>"
+                self, f"{pg_name}", self.fnt,
+                (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                 "<b>There are no Robot FPO in the assembly</b><br><br>"
                  "You must select a valid Assembly Robot document"))
             return
         #
@@ -1164,8 +1184,9 @@ class O2PDialog(QDialog):
 
         if ojl == 0:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                ("<b>There are no Joints in the assembly</b><br><br>"
+                self, " ", self.fnt,
+                (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                 "<b>There are no Joints in the assembly</b><br><br>"
                  "You must assign them"))
 
         # deactivate appropriate buttons
@@ -1349,8 +1370,9 @@ class O2PDialog(QDialog):
         esn = len(raw_sel)
         if esn == 0:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                "<b>Joint Face Selection</b><br><br>You must select a Face")
+                self, " ", self.fnt,
+                (f"<b>{pg_name} - <b>Select Face</b><br><br>"
+                 "<b>Joint Face Selection</b><br><br>You must select a Face"))
             return False
         elif esn == 1:
             s0 = raw_sel[0]

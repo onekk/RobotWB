@@ -16,27 +16,6 @@ def _reload_module(module_name: str) -> None:
     reload(module)
 
 
-class rbt_cmd1:
-    """Robot tools command 1."""
-    def GetResources(self):
-        """Resources."""
-        return {
-            'Pixmap': os.path.join(wb_path, 'resources/icons/rbt_createRobot.svg'),
-            # 'Accel': "F11",
-            'MenuText': "Create Robot Object",
-            'ToolTip': "<b>Create Robot Object</b>"
-                }
-
-    def Activated(self):
-        """Activated."""
-        from . import create_robot_obj
-        create_robot_obj.run()
-
-    def IsActive(self):
-        """IsActive."""
-        return True
-
-
 class rbt_cmd2:
     """Robot tools command 1."""
     def GetResources(self):
@@ -101,7 +80,6 @@ class rbt_cmd4:
         return True
 
 
-Gui.addCommand('RBT_crob', rbt_cmd1())
 Gui.addCommand('RBT_strob', rbt_cmd2())
 Gui.addCommand('RBT_anrob', rbt_cmd3())
 Gui.addCommand('RBT_defrob', rbt_cmd4())
