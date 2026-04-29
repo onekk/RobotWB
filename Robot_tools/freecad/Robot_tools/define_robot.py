@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.13"
-__build__ = "20260428_1254"
+__version__ = "0.14"
+__build__ = "20260429_1534"
 
 
 import sys
@@ -65,7 +65,8 @@ v0.10 - Added code to correctly populate Robot_FPO.
 v0.11 - Some fix in add joints logic.
 v0.12 - Updated to be used also in robot_test.
       - Message boxes fixed to show program name and the context.
-v0.13 - Updated program run detection logic. 
+v0.13 - Updated program run detection logic.
+v0.14 - Added some code to analyse faces.
 """
 
 fcl_err = App.Console.PrintError
@@ -256,6 +257,66 @@ def roundrot(r_rot, prec=6):
 
 
 # ------------------------------------------------
+#                Geometric functions
+# ------------------------------------------------
+
+
+def find_center(jnt_nm, jnt_data, dbg_s=False):
+    """Find center from edges of joint mating faces."""
+    ptc_f1 = jnt_data['fcc_f1']
+    ptc_f2 = jnt_data['fcc_f2']
+    #
+    if dbg_s:
+        dbg_msg = (
+            f"-- {jnt_nm}\n"
+            f"face1 >> {ptc_f1}\n"
+            f"face2 >> {ptc_f2}\n")
+        fcl_msg(dbg_msg)
+    pts_f1 = sort_centers(ptc_f1)
+    pts_f2 = sort_centers(ptc_f2)
+    #
+    sptf1 = sorted(pts_f1, key=lambda x: x[1])
+    sptf2 = sorted(pts_f2, key=lambda x: x[1])
+    #
+    if dbg_s:
+        dbg_msg = (
+            f"f1: {sptf1[-1]}\n"
+            f"f2: {sptf2[-1]}\n")
+        fcl_msg(dbg_msg)
+    return sptf1, sptf2
+
+
+def sort_centers(c_lst):
+    """Sort centers data."""
+    # fcl_msg(f"list: {c_lst}\n")  # DBG
+    tol = 0.001  # FIXME: Raise the tol value?
+    pts = []
+    n_pts = []
+    cnt = 1
+    lc = True
+    mn = len(c_lst) - 1
+    pts.append(V3(*c_lst[0]))
+    n_pts.append(1)
+    while lc:
+        pt_v2 = V3(*c_lst[cnt])
+        for v_idx, v in enumerate(pts):
+            dt = v.distanceToPoint(pt_v2)
+            if dt > tol:
+                pts.append(pt_v2)
+                n_pts.append(1)
+            else:
+                n_pts[v_idx] += 1
+        # print(f"cnt: {cnt}, {mn} pts: {pts} n_pts: {n_pts}\n")
+        cnt += 1
+        if cnt >= mn:
+            lc = False
+
+    s_list = list(zip(pts, n_pts))
+
+    return s_list
+
+
+# ------------------------------------------------
 #                Assembly functions
 # ------------------------------------------------
 
@@ -314,6 +375,22 @@ def create_assembly(doc):
     asm.newObject("Assembly::JointGroup", "Joints")
     asm.recompute()
     return asm
+
+
+def resolve_asm_ref(asm_doc, refs):
+    """Resolve the asm reference returning a face."""
+    obj_name = UtilsAssembly.getObject(refs)
+    obj_ref = UtilsAssembly.getObjsNamesAndElement(obj_name, refs[1])
+    print(f"obj_ref: {obj_ref}")
+
+    element_name = UtilsAssembly.getElementName(obj_ref[1])
+    elt_type, el_num = UtilsAssembly.extract_type_and_number(element_name)
+
+    if elt_type == "Face":
+        face = obj_name.Shape.getElement(element_name)
+        return face
+    else:
+        return None
 
 
 # ------------------------------------------------
@@ -1330,8 +1407,17 @@ class O2PDialog(QDialog):
             j_ref1 = [jnt_fc1_oref, jnt_fc1_oref]
             j_ref2 = [jnt_fc2_oref, jnt_fc2_oref]
 
+            # TODO: Insert here a way to see the revolute joint center
+            #       Evaluation of correctness could be done using faces and
+            #       passing to
+
+            self.analyze_faces(
+                [(jnt_fc1_obj, jnt_fc1_oref),
+                 (jnt_fc2_obj, jnt_fc2_oref)], j_lbl)
+
             revj = add_revolute(
-                self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)], j_lbl)
+                self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)],
+                j_lbl)
             self.wk_asm.recompute()
             self.add_link2FPO(revj)
             jr1l = f"{jnt_fc1_obj.Name}.{jnt_fc1_oref}"
@@ -1359,6 +1445,60 @@ class O2PDialog(QDialog):
         dir_cont = self.rob_obj.Robot_joints_dir
         dir_cont.append(1)
         self.rob_obj.Robot_joints_dir = dir_cont
+
+    def analyze_faces(self, faces, jnt_id):
+        """Analyze faces object."""
+        #
+        fc1_obj = faces[0][0]
+        fc2_obj = faces[1][0]
+        fc1_ref = faces[0][1]
+        fc2_ref = faces[1][1]
+
+        face1 = resolve_asm_ref(self.wk_asm, [fc1_obj, fc1_ref])
+        face2 = resolve_asm_ref(self.wk_asm, [fc2_obj, fc2_ref])
+
+        fcl_msg((
+            f"fc1_obj: {fc1_obj.Name} face1: {face1}\n"
+            f"fc2_obj: {fc2_obj.Name} face2: {face2}\n")
+        )
+        if face1 is not None and face2 is not None:
+            res0, f1_cclst = self.scan_edges(face1, jnt_id, 1, False)
+            res1, f2_cclst = self.scan_edges(face2, jnt_id, 1, False)
+            if res0 is False or res1 is False:
+                # TODO: Add a messagebox to signal the failure
+                fcl_msg("something has gone wrong!")
+                return
+            # FIXME: Set the dbg_flag to False once tested
+            sptf1, sptf2 = find_center(
+                jnt_id, {"fcc_f1": f1_cclst, "fcc_f2": f2_cclst}, True)
+            fcl_msg((
+                f"{jnt_id} scan face results:"
+                f"sptf1: {sptf1}\n\n"
+                f"sptf2: {sptf2}\n\n"
+            ))
+
+        else:
+            fcl_msg("Analyze face failure\n")
+
+    def scan_edges(self, face, jnt_id, fc_n, dbg_s=False):
+        """Scan edges to find some common center."""
+        if dbg_s:
+            fcl_msg(f"---->  joint {jnt_id} >> face {fc_n}\n")
+        face_sh = face.OuterWire
+        # TODO: Add some chek if outerwire is returning a correct wire?
+        fcc = []
+        for e_idx, edge in enumerate(face_sh.Edges):
+            e_c = edge.Curve
+            if e_c.TypeId == "Part::GeomCircle":
+                ecc = e_c.Center
+                if dbg_s:
+                    fcl_msg(f"-- Edge {e_idx} Center  {ecc}\n")
+                fcc.append(roundvec(ecc))
+        #
+        if fcc != []:
+            return True, fcc
+        else:
+            return False, []
 
     def select_face(self, dbg_s=False):
         """Select Face."""
