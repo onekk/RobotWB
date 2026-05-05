@@ -611,6 +611,12 @@ class O2PDialog(QDialog):
 
         rb_obj.recompute()
         asm_doc.recompute()
+
+        # save refs
+        self.wk_asm_d = asm_doc
+        self.wk_asm = asm
+        self.rob_obj = rb_obj
+        
         # Disable "Create ASM" button
         set_wid_en(self, ("btn_cre_asm",), False)
         # Create the "Add joint" groupbox
