@@ -1,6 +1,6 @@
-"""Robot Test.
+"""Robot Define New.
 
-Name: study_asm.py
+Name: define_robot.py
 
 See Changelog below.
 
@@ -81,6 +81,16 @@ fcl_warn = App.Console.PrintWarning
 mdtsp = "%y%m%d_%H%M"
 MODULE_PATH = pathlib.Path(__file__).parent
 
+if str(MODULE_PATH.stem) == "Robot_test":
+    pg_name = "Robot test"
+    fcl_msg("Running on Robot Test\n")
+elif str(MODULE_PATH.stem) == "Robot_tools":
+    pg_name = "Robot Tools"
+    fcl_msg("Running on Robot Tools\n")
+else:
+    pg_name = "Standalone"
+    fcl_msg("Running from command line\n")
+
 V3 = App.Vector
 Rotation = App.Rotation
 Placement = App.Placement
@@ -122,33 +132,33 @@ def add_grounded(asm, obj):
     asm.recompute()
 
 
-def add_revolute(asm, j_lbl, plt1, plr1, plt2, plr2, ref1, ref2,
-                 ofs1=Placement(VEC0, ROT0), ofs2=Placement(VEC0, ROT0)):
-    """Add the grounded object."""
+def add_revolute(asm, j_refs, j_lbl, dbg_s=False):
+    """Add a revolute joint."""
     joint_group = UtilsAssembly.getJointGroup(asm)
-    rev_j = joint_group.newObject("App::FeaturePython", "RevoluteJoint")
-    JointObject.Joint(rev_j, 1)
-    JointObject.ViewProviderJoint(rev_j.ViewObject)
-    rev_j.recompute()
-    rev_j.Detach1 = False
-    rev_j.Detach2 = False
-    rev_j.EnableAngleMax = False
-    rev_j.EnableAngleMin = False
-    rev_j.EnableLengthMax = False
-    rev_j.EnableLengthMin = False
-    rev_j.JointType = "Revolute"
-    rev_j.Label = j_lbl
-    rev_j.Label2 = ""
-    rev_j.Offset1 = ofs1
-    rev_j.Offset2 = ofs2
-    rev_j.Placement1 = Placement(plt1, plr1)
-    rev_j.Placement2 = Placement(plt2, plr2)
-    rev_j.Reference1 = ref1
-    rev_j.Reference2 = ref2
-    rev_j.Suppressed = False
-    rev_j.Visibility = False
-    rev_j.recompute()
-    return rev_j
+    revj = joint_group.newObject("App::FeaturePython", "RevoluteJoint")
+    revj.Label2 = j_lbl
+    a_jnt = JointObject.Joint(revj, 1)
+    JointObject.ViewProviderJoint(revj.ViewObject)
+    #
+    revj.Reference1 = j_refs[0]
+    revj.Reference2 = j_refs[1]
+
+    revj.recompute()
+    asm.recompute()
+    #
+    pl1 = a_jnt.findPlacement(revj, revj.Reference1, 0)
+    pl2 = a_jnt.findPlacement(revj, revj.Reference2, 0)
+    #
+    if dbg_s:
+        fcl_msg((
+            f"Reference1: {pl1}\n"
+            f"Reference2: {pl2}\n")
+        )
+    #
+    revj.recompute()
+    asm.recompute()
+
+    return revj
 
 
 def create_assembly(doc):
@@ -186,7 +196,7 @@ class O2PDialog(QDialog):
     ui_title = "Define Robot"
     IsInit = False  # flag to avoid unwanted action execution during init.
     # Flags dictionary, place here sane defaults
-    flags = {"chb_cpa": False, }
+    flags = {"chb_cpa": False, "chb_gdj": True}
     #
     tab_data = {
         "ma": {"nm": "Main", "cn": 0}, "lg": {"nm": "Log", "cn": 0}}
@@ -391,7 +401,6 @@ class O2PDialog(QDialog):
         func_btns = [
             ("btn_cre_asm", "Create ASM", self.create_asm),
             ("btn_load_step", "Load STEP", self.act_load_step),
-            ("btn_add_jnt", "Add Joints", self.act_add_joint),
         ]
 
         brow = 0
@@ -450,9 +459,13 @@ class O2PDialog(QDialog):
         btn_jnt_s2.clicked.connect(self.select_face)
 
         brow += 1
-        chb_sgj = cm_chb(self, "chb_sgj", "Grounded Joint", self.fnt, True)
-        js_gb0l.addWidget(chb_sgj, brow, 0, 1, 2)
-        chb_sgj.setChecked(True)
+        chb_gdj = cm_chb(self, "chb_gdj", "Grounded Joint", self.fnt, True)
+        js_gb0l.addWidget(chb_gdj, brow, 0, 1, 2)
+        if self.flags.get("chb_gdj", True):
+            chb_gdj.setChecked(True)
+        else:
+            chb_gdj.setChecked(False)
+            chb_gdj.setEnabled(False)
 
         brow += 1
         btn_jnt_add = cm_btn(self, "btn_jnt_add", "Add Joint", self.fnt, 0)
@@ -551,6 +564,7 @@ class O2PDialog(QDialog):
         if o_doc:
             self.check_asm()
             setview(o_doc.Name)
+            self.jnt_setui()
 
     # --------------------------------------------
     #                Assembly functions
@@ -599,14 +613,8 @@ class O2PDialog(QDialog):
         asm_doc.recompute()
         # Disable "Create ASM" button
         set_wid_en(self, ("btn_cre_asm",), False)
-        # Enable "Add joint" button
-        set_wid_en(self, ("btn_add_jnt",), True)
-
-    def act_add_joint(self):
-        """Add Joint panel assembly."""
+        # Create the "Add joint" groupbox
         self.jnt_setui()
-        self.jnt_ec = 0
-        return
 
     def act_load_step(self):
         """Load Step file."""
@@ -614,17 +622,19 @@ class O2PDialog(QDialog):
         # fcl_msg(f"STEPFile: {sf}\n")
         App.openDocument(sf)
 
-    def check_asm(self):
+    def check_asm(self, dbg_s=False):
         """Check the correctness of the asm file."""
+        dbg_s = True  # DBG
         asm_objs = self.wk_asm_d.getObjectsByLabel("Robot_Assembly")
         ran = len(asm_objs)
         if ran > 0:
             pass
         else:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                ("<b>There are no Robot Assembly definitions in the document</b>"
-                 "<br><br> You must select a correct document or create one"))
+                self, " ", self.fnt,
+                (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                 "There are no Robot Assembly  definitions in the document.<br>"
+                 "You must select a correct document or create one"))
             # FIXME: See if the activation of Create ASM button is correct here.
             set_wid_en(self, ("btn_cre_asm",), True)
             return
@@ -633,10 +643,10 @@ class O2PDialog(QDialog):
             self.wk_asm = asm_objs[0]
         else:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                (f"<b>There are: [{ran}] Robot Assembly objects "
-                 "in the document</b><br><br>"
-                 "You must select one"))
+                self, " ", self.fnt,
+                (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                 f"<b>There are: [{ran}] Robot Assembly objects in the document"
+                 "</b><br><br>You must select one"))
             # TODO: add the corresponding selection dialog.
             return
 
@@ -647,42 +657,92 @@ class O2PDialog(QDialog):
                 self.rob_obj = rob_objs[0]
             else:
                 msg_box(
-                    self, "Robot_tools", self.fnt,
-                    (f"<b>There are: [{ron}] FPO in the assembly</b><br><br>"
+                    self, " ", self.fnt,
+                    (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                     f"<b>There are: [{ron}] FPO in the assembly</b><br><br>"
                      "You must select the working one"))
                 # TODO: create the selection dialog
                 return
         else:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                ("<b>There are no Robot FPO in the assembly</b><br><br>"
+                self, f"{pg_name}", self.fnt,
+                (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                 "<b>There are no Robot FPO in the assembly</b><br><br>"
                  "You must select a valid Assembly Robot document"))
             return
         #
+        # NOTE: check for an existing object name "GroundedJoint",
+        #       it seems the only way to determine if a grounded joint exist.
+        grd_objf = False
+        grd_obj = self.wk_asm.getObject("GroundedJoint")
+
+        if grd_obj is not None:
+            if dbg_s:
+                fcl_msg("Grounded joint present\n")  # DBG
+            grd_objf = True
+        else:
+            if dbg_s:
+                fcl_msg("No grounded joint!\n")  # DBG
+            pass
+        #
         ojl = len(self.wk_asm.Joints)
+
+        if dbg_s:
+            fcl_msg(f">> ojl: {ojl}\n")
+
         if ojl == 0:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                ("<b>There are no Joints in the assembly</b><br><br>"
+                self, " ", self.fnt,
+                (f"<b>{pg_name} - <b>Check Assembly</b><br><br>"
+                 "<b>There are no Joints in the assembly</b><br><br>"
                  "You must assign them"))
 
         # deactivate appropriate buttons
         # TODO: we could deactivate also the "Select Asembly File" button too?
         set_wid_en(self, ("btn_cre_asm", "btn_selrbf"), False)
 
+        if grd_objf is True:
+            self.jnt_ec = 1
+            # NOTE: use of the flag as at this point the ui is not yet created.
+            self.flags["chb_gdj"] = False
+            self.add_joint2ui(self.jnt_ec + 1, [0, "grounded", "--", "--"])
+
         # Check if assembly object has only a Joint group on it
         # checking Group property length > 1 will tell if there are other
         # objects
         # FIXME: it is rough guess see if there are alternatives.
         if len(self.wk_asm.Group) > 1:
-            set_wid_en(self, ("btn_add_jnt",), True)
+            pass
+            # set_wid_en(self, ("btn_add_jnt",), True)  #
             # NOTE: no need to activate the "Load STEP" button as the Document
             # with robot components will be opened by FreeCAD for us.
         else:
-            set_wid_en(self, ("btn_add_jnt", "btn_load_step"), True)
+            set_wid_en(self, ("btn_load_step",), True)
 
         if ojl > 0:
-            print(f"obj: {ojl}")
+            self.jnt_ec += ojl
+            for jn_idx, joint in enumerate(self.wk_asm.Joints):
+                jnt_lb2 = joint.Label2
+                jnt_typ = joint.JointType
+                jnt_ref1 = joint.Reference1
+                jnt_ref2 = joint.Reference2
+                # NOTE: eventually tune the dbg output
+                if dbg_s:
+                    fcl_msg((
+                        f" -- Joint Number > {jn_idx}\n"
+                        f" -- Joint Name > {joint.Name}\n"
+                        f" -- Joint Label > {joint.Label}\n"
+                        f" -- Joint Label2 > {jnt_lb2}\n"
+                        f" -- Joint TypeId > {jnt_typ}\n"
+                        f" -- Joint Reference1 > {jnt_ref1}\n"
+                        f" -- Joint Reference2 > {jnt_ref2}\n"
+                        )
+                    )
+                if jnt_lb2[:6] == "rb_jnt":
+                    jr1l = f"{jnt_ref1[0].Name}.{jnt_ref1[1][0]}"
+                    jr2l = f"{jnt_ref2[0].Name}.{jnt_ref2[1][0]}"
+                    self.add_joint2ui(
+                        jn_idx + 3, [jn_idx + 1, jnt_typ, jr1l, jr2l])
 
         # TODO: In case of already present joints, we must:
         # 1) alter here jnt_ec value
@@ -695,86 +755,185 @@ class O2PDialog(QDialog):
     #                   Add joint
     # --------------------------------------------
 
-    def add_jnt2asm(self):
+    def add_jnt2asm(self, dbg_s=False):
         """Add a joint to the assembly and the FPO."""
-        fcl_msg(f"Joint meta: {self.jnt_meta}\n")
-        # NOTE: correct sequence:
-        # 1) validate the sequence
-        # 2) reset the face counter to 1
-        # 3) reset the jnt_meta dic to empty
-        # 4) advance jnt_ec by 1
-        # 5) set buttons Select Face1 and Select Face2 state
+        dbg_s = True  # BDG
+        if dbg_s:
+            fcl_msg(f"Joint meta: {self.jnt_meta}\n")
+
         dks = list(self.jnt_meta)
         jn = int(dks[0][5:7])
-        jf = int(dks[0][7:9])
-        jid0 = self.jnt_meta[dks[0]]
+        jf1 = int(dks[0][7:9])
+        jmo0 = self.jnt_meta[dks[0]]
+        jnt_fc1_onm = jmo0['ob_nm']
+        jnt_fc1_obj = self.wk_asm.getObject(jnt_fc1_onm)
+        jnt_fc1_oref = jmo0['ob_ref']
+
+        if dbg_s:
+            fcl_msg(f"Joint number {jn} Face {jf1} jid: {jmo0}\n")
+            fcl_msg((
+                f"-- f1 obj name: {jnt_fc1_onm}\n"
+                f"-- f1 obj ref: {jnt_fc1_oref}\n"
+                f"-- f1 obj Label: {jnt_fc1_obj.Label}\n"
+                f"-- f1 obj Label2: {jnt_fc1_obj.Label2}\n")
+            )
+
         if len(dks) == 1:
-            fcl_msg(f"Joint number {jn} Face {jf} jid: {jid0}\n")
             # one face selected, so the joint is probably the grounded one.
             if jn == 0:
                 # This is probably a grounded joint as it is logically the first
                 # to be set.
-                jnt_fc1_onm = jid0['ob_nm']
-                jnt_fc1_se = jid0['sub_el'][0]
-                jnt_obj = self.wk_asm.getObject(jnt_fc1_onm)
-                add_grounded(self.wk_asm, jnt_obj)
+                add_grounded(self.wk_asm, jnt_fc1_obj)
                 self.wk_asm.recompute()
                 # Reset the interface
                 set_wid_en(self, ("btn_jnt_s1",), True)
-                set_wid_en(self, ("chb_sgj",), False)
+                set_wid_en(self, ("chb_gdj",), False)
                 # TODO: populate the joint frame with a joint type.
-                self.add_joint2ui(jn + 2, [0, "grounded", jnt_fc1_se, "--"])
+                self.add_joint2ui(jn + 2, [0, "grounded", "--", "--"])
                 # advance joint counter and reset face counter and data dict
                 self.jnt_ec += 1
                 self.jnt_fc = 1
                 self.jnt_meta = {}
+                return
             else:
                 # Emit an error as two faces are needed
                 return
 
-        # NOTE: following code is to add the joint to the ASM
-        # add_grounded(asm, base_obj)
-        # base_obj.recompute()
+        # At this point we could be sure that there are two objects in the list
+        jf2 = int(dks[1][7:9])
+        jmo1 = self.jnt_meta[dks[1]]
+        jnt_fc2_onm = jmo1['ob_nm']
+        jnt_fc2_obj = self.wk_asm.getObject(jnt_fc2_onm)
+        jnt_fc2_oref = jmo1['ob_ref']
+        #
+        if dbg_s:
+            fcl_msg((
+                f"Joint number {jn} Face {jf2} jmo1: {jmo1}\n"
+                f"-- f2 obj name: {jnt_fc2_onm}\n"
+                f"-- f2 obj ref: {jnt_fc2_oref}\n")
+            )
+        #
+        if jnt_fc2_obj is not None:
+            # NOTE: operations sequence:
+            # 1) validate the sequence
+            if dbg_s:
+                fcl_msg(f"-- f2 obj Label: {jnt_fc2_obj.Label}\n")
+                fcl_msg(f"-- f2 obj Label2: {jnt_fc2_obj.Label2}\n")
 
-        # rev1 = add_revolute(
-        #     asm, "Revolute001",
-        #     V3(0.0, 317.0, 0.0), Rotation(*[0.0, 0.0, -90.0]),
-        #     V3(0.0, 317.0, 0.0), Rotation(*[180.0, 0.0, 90.0]),
-        #     [jnt1_obj, ['Face1977', 'Face1977']],
-        #     [base_obj, ['Face792', 'Face792']],
-        #     Placement(VEC0, Rotation(180, 0, 0)),
-        #     Placement(VEC0, ROT0)
-        # )
+            # NOTE: we must use a conventional Label2 composed as follow:
+            #  rb_jntXX (robot joint) X is an integer it will permit 99 joints
+            # ee_jntXX (end effector) same as above
+            #
+            # this way we could sort out using Label2 immediately
+            # the joint type as there is no way to distinguish them by Name
+            # alternatively we could plan as example
+            # rb_ro_jnt the added _ro_ will mean rotation but could also be
+            # sl = sliding, or pr = prismatic. Let me know
 
-        # rev1.recompute()
+            j_lbl = f"rb_jnt{self.jnt_ec:02d}"  # see note above
+            j_ref1 = [jnt_fc1_oref, jnt_fc1_oref]
+            j_ref2 = [jnt_fc2_oref, jnt_fc2_oref]
 
-    def select_face(self):
+            revj = add_revolute(
+                self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)], j_lbl)
+            self.wk_asm.recompute()
+            self.add_link2FPO(revj)
+            jr1l = f"{jnt_fc1_obj.Name}.{jnt_fc1_oref}"
+            jr2l = f"{jnt_fc2_obj.Name}.{jnt_fc2_oref}"
+            self.add_joint2ui(jn + 2, [0, "revolute", jr1l, jr2l])
+            # advance joint counter and reset face counter and data dict
+            self.jnt_ec += 1
+            self.jnt_fc = 1
+            self.jnt_meta = {}
+            set_wid_en(self, ("btn_jnt_s1",), True)
+            set_wid_en(self, ("btn_jnt_s2",), False)
+        else:
+            if dbg_s:
+                fcl_msg(f"-- f2 obj not found: {jnt_fc2_obj}\n")
+            # emit an error?
+            pass
+    
+    def add_link2FPO(self, joint):
+        """Add the joint to the FPO."""
+        link_cont = self.rob_obj.Robot_joints
+        link_cont.append(joint)
+        self.rob_obj.Robot_joints = link_cont
+        #
+        # Add the rotation dir data
+        dir_cont = self.rob_obj.Robot_joints_dir
+        dir_cont.append(1)
+        self.rob_obj.Robot_joints_dir = dir_cont
+
+    def select_face(self, dbg_s=False):
         """Select Face."""
-        fcl_msg(f"Select Face{self.jnt_fc}\n")
+        # dbg_s = True  # DBG
+        if dbg_s:
+            fcl_msg(f"Select Face{self.jnt_fc}\n")
+        #
         raw_sel = Gui.Selection.getSelectionEx()
-        esn = len(raw_sel)
+        #
+        if dbg_s:
+            fcl_msg(f"Raw_ sel: {raw_sel}\n")
 
+        esn = len(raw_sel)
         if esn == 0:
             msg_box(
-                self, "Robot_tools", self.fnt,
-                "<b>Joint Face Selection</b><br><br>You must select a Face")
+                self, " ", self.fnt,
+                (f"<b>{pg_name} - <b>Select Face</b><br><br>"
+                 "<b>Joint Face Selection</b><br><br>You must select a Face"))
             return False
         elif esn == 1:
             s0 = raw_sel[0]
             obj = s0.Object
+            obj_nm = obj.Name
             sub_ent = s0.SubElementNames
             obj_typ = obj.TypeId
+            obj_par = obj.Parents
             fcl_msg((
-                f"Obj Name: {obj.Name}\n"
+                f"Selection: {s0}\n"
+                f"Obj Name: {obj_nm}\n"
                 f"Obj Label: {obj.Label}\n"
                 f"Obj Type: {obj_typ}\n"
+                f"Obj Parents: {obj_par}\n"
                 f"Obj SubElements: {sub_ent}\n"
             )
             )
+            # NOTE: try to determine if the object.Name exist in the Assembly doc
+            #       if the object is not existent it is probably in a
+            #       "Linked Part container"
+            # FIXME: probably an hack!
+            sobj_nm = ""
+            s_obj_ref = ""
+            #
+            sc_obj = self.wk_asm.getObject(obj_nm)
+            if sc_obj is None:
+                obj_plen = len(obj.Parents)
+
+                # double check just in case hack is not correct
+                if obj_plen > 1:
+                    found = False
+                    for c_obj in obj_par:
+                        as_obj = c_obj[0]
+                        as_ref = c_obj[1]
+                        as_refc = as_ref.split('.')
+                        as_typ = as_obj.TypeId
+                        fcl_msg(f"as_typ: {as_typ}\n")
+                        if as_typ == "Assembly::AssemblyObject":
+                            sobj_nm = as_refc[0]
+                            s_obj_ref = f"{as_refc[1]}.{sub_ent[0]}"
+                            found = True
+                        if found:
+                            break
+            else:
+                sobj_nm = obj_nm
+                s_obj_ref = sub_ent[0]
+
+            # TODO: add a check in case of no match?
+
             jnt_elnm = f"joint{self.jnt_ec:02d}{self.jnt_fc:02d}"
             self.jnt_meta[jnt_elnm] = {}
-            self.jnt_meta[jnt_elnm]["ob_nm"] = obj.Name
-            self.jnt_meta[jnt_elnm]["sub_el"] = sub_ent
+            self.jnt_meta[jnt_elnm]["ob_nm"] = sobj_nm
+            self.jnt_meta[jnt_elnm]["ob_ref"] = s_obj_ref
             #
             if self.jnt_fc == 1:
                 self.jnt_fc = 2
