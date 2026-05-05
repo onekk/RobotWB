@@ -530,7 +530,7 @@ class O2PDialog(QDialog):
             lbl = cm_lbl(self, f"{name}{jpr}", str(val), self.fnt, 0)
             lbl.setFrameShape(QFrame.Shape.Panel)
             lbl.setFrameShadow(QFrame.Shadow.Sunken)
-            lbl.setStyleSheet("QLabel {background-color: white;}")
+            lbl.setStyleSheet("QLabel {background-color: palette(base); color: palette(text);}")
             lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
             lay.addWidget(lbl, jpr, idx, 1, 1)
 
@@ -616,7 +616,7 @@ class O2PDialog(QDialog):
         self.wk_asm_d = asm_doc
         self.wk_asm = asm
         self.rob_obj = rb_obj
-        
+
         # Disable "Create ASM" button
         set_wid_en(self, ("btn_cre_asm",), False)
         # Create the "Add joint" groupbox
