@@ -497,6 +497,7 @@ class O2PDialog(QDialog):
         self.log_win.show()
 
     def refresh_joints_panel(self):
+        # -- update joints panel --
         # 1. delete the widgets
         lay = self.findChild(QObject, "jn_gb0_l")
         while lay.count() > 4:
@@ -512,6 +513,12 @@ class O2PDialog(QDialog):
         # 3. rebuild from start
         self.check_asm()
 
+        # -- update grounded checkbox --
+        chb = self.findChild(QObject, "chb_gdj")
+        if chb is not None:
+            f = self.flags.get("chb_gdj", True):
+            chb.setChecked(f)
+            chb.setEnabled(f)
 
     def closeEvent(self, event):
         """Called on close event."""
@@ -861,7 +868,7 @@ class O2PDialog(QDialog):
 
             # NOTE: we must use a conventional Label2 composed as follow:
             #  rb_jntXX (robot joint) X is an integer it will permit 99 joints
-            # ee_jntXX (end effector) same as above
+            #  ee_jntXX (end effector) same as above
             #
             # this way we could sort out using Label2 immediately
             # the joint type as there is no way to distinguish them by Name

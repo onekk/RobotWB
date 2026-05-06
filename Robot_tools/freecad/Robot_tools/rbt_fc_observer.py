@@ -13,6 +13,8 @@ __version__ = "0.01"
 __build__ = "20260506_0736"
 
 import FreeCAD as App
+from PySide.QtCore import QTimer
+
 
 """
 ----------------------------------------
@@ -36,8 +38,8 @@ class RbtObserver:
         Refresh the panel after joint deletion
         """
         d = self.dialog
-        if (d.wk_asm_d is None) or (obj.Document is not d.ws_asm_d):
+        if (d.wk_asm_d is None) or (obj.Document is not d.wk_asm_d):
             return
         if hasattr(obj, "ObjectToGround") or hasattr(obj, "JointType"):
-            d.refresh_joints_panel()
+            QTimer.singleShot(0, d.refresh_joints_panel) #deferred call,  d.refresh_joints_panel()
 
