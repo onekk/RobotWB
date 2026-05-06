@@ -909,7 +909,7 @@ class O2PDialog(QDialog):
         if dbg_s:
             fcl_msg(f"Select Face{self.jnt_fc}\n")
         #
-        raw_sel = Gui.Selection.getSelectionEx()
+        raw_sel = Gui.Selection.getSelectionEx("",0)
         #
         if dbg_s:
             fcl_msg(f"Raw_ sel: {raw_sel}\n")
