@@ -8,8 +8,11 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.05"
-__build__ = "20260411_1919"
+__version__ = "0.07"
+__build__ = "20260428_1248"
+
+
+import pathlib
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -46,16 +49,36 @@ from freecad.Robot_tools.rbt_helpers_math import roundrot, roundvec
 ----------------------------------------
 Changelog:
 ----------------------------------------
-v0.02 - converted to make it compatible with the WB and the FPO.
-v0.03 - added direction field from FPO.
-v0.04 - some improvements.
-v0.05 - reworked 'Reload FPO Data' button to avoid unknown problem that causes
+v0.02 - Converted to make it compatible with the WB and the FPO.
+v0.03 - Added direction field from FPO.
+v0.04 - Some improvements.
+v0.05 - Reworked 'Reload FPO Data' button to avoid unknown problem that causes
         a buggy  movement commands (it don't honour the steps)
+v0.06 - Starting to adapt to the robot_FPO
+v0.07 - Some hacks to reset the touched overlay icon. Added a check of joints
+        dir data, to avoid initialization error.
+v0.09 - Modded to work on robot_test too.
+      - Some fixes in logic if no Robot_FPO is selected.
+      - Message boxes fixed to show program name and the context.
 """
 
 fcl_err = App.Console.PrintError
 fcl_msg = App.Console.PrintMessage
 fcl_warn = App.Console.PrintWarning
+
+
+MODULE_PATH = pathlib.Path(__file__).parent
+
+if str(MODULE_PATH.stem) == "Robot_test":
+    pg_name = "Robot test"
+    fcl_msg("Running on Robot Test\n")
+elif str(MODULE_PATH.stem) == "Robot_tools":
+    pg_name = "Robot Tools"
+    fcl_msg("Running on Robot Tools\n")
+else:
+    pg_name = "Standalone"
+    fcl_msg("Running from command line\n")
+
 
 V3 = App.Vector
 Rotation = App.Rotation
@@ -144,8 +167,9 @@ def find_joint(obj, name):
 
 
 class O2PDialog(QDialog):
-    """Show a dialog for RobotAnimator."""
+    """Show a dialog for Robot Controller."""
     #
+    ui_title = "Robot Controller"
     rob_obj = None
     # Default values for testing, assigned in set_working_robot.
     j_num = 0
@@ -182,7 +206,7 @@ class O2PDialog(QDialog):
         y_loc = (av_hei - w_hei) * 0.5
         # define window xLoc,yLoc,xDim,yDim
         self.setGeometry(x_loc, y_loc, w_wid, w_hei)
-        self.setWindowTitle(f"Robot Move - b{__build__}")
+        self.setWindowTitle(" ")  # MacOS has no title in some cases
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowStaysOnTopHint
         )
@@ -191,14 +215,24 @@ class O2PDialog(QDialog):
         self.fnt = fnt
         self.form_lay = QGridLayout(self)
 
+        mcn = 4  # fake number of column to pre adapt panel width
         row = 0
+        self.lbl_sw = cm_lbl(
+            self, "lbl_sw",
+            f"<b>{pg_name} - {self.ui_title}</b> - Build: {__build__}", self.fnt, 0)
+        self.form_lay.addWidget(self.lbl_sw, row, 0, 1, mcn)
+
+        row +=1
+
         raw_sel = Gui.Selection.getSelection("", 2, True)
         esn = len(raw_sel)
 
         if esn == 0:
             msg_box(
-                self, "Robot", self.fnt,
-                "<b>Robot Selection</b><br><br>You must select a Robot FPO")
+                self, " ", self.fnt,
+                (f"<b>{pg_name}</b> - <b>Robot Selection</b><br><br>"
+                 "You must select a Robot FPO"))
+            self.close()
             return
         elif esn == 1:
             obj = raw_sel[0]
@@ -206,8 +240,18 @@ class O2PDialog(QDialog):
             # fcl_msg(f"Object Name: {obj.Name[:9]}\n")
             if obj_typ == "App::FeaturePython" and obj.Name[:9] == "Robot_FPO":
                 # fcl_msg("Robot OBJ OK\n")
-                lbl_rob_id = cm_lbl(self, "lbl_rob_id", f"<b>{obj.Name}</b>", self.fnt, 0)
-                self.form_lay.addWidget(lbl_rob_id, row, 0, 1, 4)
+                lbl_rob_t = cm_lbl(
+                    self, "lbl_rob_t", "<b>Robot:</b>", self.fnt, 0)
+                self.form_lay.addWidget(lbl_rob_t, row, 0, 1, 1)
+
+                lbl_rob_id = cm_lbl(
+                    self, "lbl_rob_id", f"{obj.Name}", self.fnt, 0)
+
+                lbl_rob_id.setFrameShape(QFrame.Shape.Panel)
+                lbl_rob_id.setFrameShadow(QFrame.Shadow.Sunken)
+                lbl_rob_id.setStyleSheet("QLabel {background-color: white;}")
+                lbl_rob_id.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+                self.form_lay.addWidget(lbl_rob_id, row, 1, 1, 1)
                 row += 1
                 self.rob_obj = obj
                 self.set_working_rbt()
@@ -219,8 +263,9 @@ class O2PDialog(QDialog):
                 self.set_defaults()
             else:
                 msg_box(
-                    self, "Robot", self.fnt,
-                    "<b>Robot Selection</b><br><br>You must select a Robot FPO")
+                    self, " ", self.fnt,
+                    (f"<b>{pg_name}</b> - <b>Robot Selection</b><br><br>"
+                     "You must select a Robot FPO"))
                 # FIXME: close the dialog?
                 # NOTE:  it seems OK to simply return!
                 return
@@ -385,7 +430,14 @@ class O2PDialog(QDialog):
             fcl_msg(f"{j_n} {jnt.Label}\n")
             fcl_msg(f"OF2:  {jnt_o2}\n")
             jnt.Offset2 = Placement(VEC0, Rotation())
+            # FIXME: maybe a dirty hack but it seems to reset the overlay icon.
+            jnt.purgeTouched()
+            jnt.ViewObject.signalChangeIcon()
+            # NOTE: following recompute seems to not work.
             asm_obj.recompute()
+            # FIXME: maybe a dirty hack but it seems to reset the overlay icon.
+            asm_obj.purgeTouched()
+            asm_obj.ViewObject.signalChangeIcon()
             obj = getObjByName(wid, fl_nm)
             fcl_msg(f"Field name: {fl_nm}, obj: {obj}\n")  # DBG
             obj.setText(str(0.0))
@@ -427,27 +479,32 @@ class O2PDialog(QDialog):
         # dbg_s = True
         if self.rob_obj.Robot_assembly is None:
             msg_box(
-                self, "Robot", self.fnt,
-                "<b>Robot</b><br><br>You must select a complete Robot Object")
+                self, " ", self.fnt,
+                (f"<b>{pg_name}</b> - <b>Set working Robot</b>"
+                 "<br><br>You must select a complete Robot Object"))
+
             return
         else:
             obj = self.rob_obj.Robot_assembly
             setview(obj.Document.Name, 1)
-            jnt_nm = len(self.rob_obj.Robot_joints)
-            if jnt_nm < 1:
+            jnt_n = len(self.rob_obj.Robot_joints)
+            jntd_n = len(self.rob_obj.Robot_joints_dir)
+
+            if jnt_n < 1:
                 msg_box(
-                    self, "Robot", self.fnt,
-                    "<b>Robot</b><br><br>You must select a complete Robot Object")
+                    self, " ", self.fnt,
+                    (f"<b>{pg_name}</b> - <b>Set working Robot</b>"
+                     "<br><br>You must select a complete Robot Object"))
                 return
             if dbg_s:
-                fcl_msg(f"Joint numbers: {jnt_nm}\n")
-            self.j_num = jnt_nm
+                fcl_msg(f"Joint numbers: {jnt_n}\n")
+            self.j_num = jnt_n
             self.j_dirs = []
             self.j_nms = []
             self.j_step = []
             self.j_vals = []
             #
-            for n in range(jnt_nm):
+            for n in range(jnt_n):
                 jnt_n = n + 1
                 self.j_nms.append(f"Joint{jnt_n:02d}")
                 self.j_vals.append(0.0)
@@ -455,16 +512,42 @@ class O2PDialog(QDialog):
         #
         if not self.rob_obj.Robot_joints_dir:
             msg_box(
-                self, "Robot", self.fnt,
-                ("<b>WARNING</b><br><br>"
+                self, "", self.fnt,
+                (f"<b>{pg_name}</b> - <b>Set working Robot</b>"
+                 "<b>WARNING</b><br><br>"
                  f"{self.rob_obj.Name} lacks of a proper <b>Robot_joints_dir</b>"
                  "<br><br>It will be populated with a 'list' "))
             dummy_lst = []
-            for n in range(jnt_nm):
+            for n in range(jnt_n):
                 dummy_lst.append(1)
             #
             self.rob_obj.Robot_joints_dir = dummy_lst
-        #
+
+        if jntd_n > jnt_n:
+            msg_box(
+                self, "Robot", self.fnt,
+                (f"<b>{pg_name}</b> - <b>Set working Robot</b>"
+                 "<b>WARNING</b><br><br>"
+                 f"{self.rob_obj.Name} <b>Robot_joints_dir</b> was not "
+                 "correctly populated.<br><br>There were too much data "
+                 "in the 'list', it has been fixed now! <br><br>"
+                 "<b>Check rotation sense correctness of each joint!</b>"))
+            jntd_l = self.rob_obj.Robot_joints_dir
+            self.rob_obj.Robot_joints_dir = jntd_l[:jnt_n]
+        elif jntd_n < jnt_n:
+            msg_box(
+                self, "Robot", self.fnt,
+                (f"<b>{pg_name}</b> - <b>Set working Robot</b>"
+                 "<b>WARNING</b><br><br>"
+                 f"{self.rob_obj.Name} <b>Robot_joints_dir</b> was not "
+                 "correctly populated.<br><br>There were too few data "
+                 "in the 'list', it has been fixed now! <br><br>"
+                 "<b>Check rotation sense correctness of each joint!</b>"))
+            jntd_l = self.rob_obj.Robot_joints_dir
+            for n in range(jnt_n - jntd_n):
+                jntd_l.append(1)
+            self.rob_obj.Robot_joints_dir = jntd_l
+            #
         self.j_dirs = self.rob_obj.Robot_joints_dir
 
     def setJointAngle(self, j_idx, value, dbg_s=False):
@@ -476,6 +559,11 @@ class O2PDialog(QDialog):
         #
         joint.Offset2 = Placement(VEC0, Rotation(value, 0, 0))
         joint.recompute()
+        # FIXME: maybe a dirty hack but it seems to reset the overlay icon.
+        joint.purgeTouched()
+        joint.ViewObject.signalChangeIcon()
+        # not fully functional here
+        # self.wk_asm.recompute()
         if dbg_s:
             fcl_msg(f"Offset2: {prev_ofs} >> {joint.Offset2}\n")
 

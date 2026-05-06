@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.06"
-__build__ = "20260421_1903"
+__version__ = "0.14"
+__build__ = "20260429_1534"
 
 
 import sys
@@ -68,10 +68,19 @@ v0.02 - Added create_asm code.
 v0.03 - Added add joint action (unfinished).
 v0.04 - Added some refinement in UI and various.
 v0.05 - Added actions needed when loading an asm doc:
-         - check the asm document for "big errors" like the absence of Robot_FPO
+         - Check the asm document for "big errors" like the absence of Robot_FPO
            and Robot_Assembly object.
-         - check for empty joints and signal it with a messagebox.
-v0.06 - added code to add joints (grounded).
+         - Check for empty joints and signal it with a messagebox.
+v0.06 - Added code to add joints (grounded).
+v0.07 - Improved check_asm.
+v0.08 - Solved 'Linked Part container' selection quirk.
+v0.09 - Added code to add revolute joint.
+v0.10 - Added code to correctly populate Robot_FPO.
+v0.11 - Some fix in add joints logic.
+v0.12 - Updated to be used also in robot_test.
+      - Message boxes fixed to show program name and the context.
+v0.13 - Updated program run detection logic.
+v0.14 - Added some code to analyse faces.
 """
 
 fcl_err = App.Console.PrintError
@@ -108,6 +117,66 @@ msg_log = []  # log message container, used to permit a dump.
 def dump_log(log_fn):
     """Dump log to a file."""
     fcl_msg(f"Log file name: {log_fn}")
+
+# ------------------------------------------------
+#                Geometric functions
+# ------------------------------------------------
+
+
+def find_center(jnt_nm, jnt_data, dbg_s=False):
+    """Find center from edges of joint mating faces."""
+    ptc_f1 = jnt_data['fcc_f1']
+    ptc_f2 = jnt_data['fcc_f2']
+    #
+    if dbg_s:
+        dbg_msg = (
+            f"-- {jnt_nm}\n"
+            f"face1 >> {ptc_f1}\n"
+            f"face2 >> {ptc_f2}\n")
+        fcl_msg(dbg_msg)
+    pts_f1 = sort_centers(ptc_f1)
+    pts_f2 = sort_centers(ptc_f2)
+    #
+    sptf1 = sorted(pts_f1, key=lambda x: x[1])
+    sptf2 = sorted(pts_f2, key=lambda x: x[1])
+    #
+    if dbg_s:
+        dbg_msg = (
+            f"f1: {sptf1[-1]}\n"
+            f"f2: {sptf2[-1]}\n")
+        fcl_msg(dbg_msg)
+    return sptf1, sptf2
+
+
+def sort_centers(c_lst):
+    """Sort centers data."""
+    # fcl_msg(f"list: {c_lst}\n")  # DBG
+    tol = 0.001  # FIXME: Raise the tol value?
+    pts = []
+    n_pts = []
+    cnt = 1
+    lc = True
+    mn = len(c_lst) - 1
+    pts.append(V3(*c_lst[0]))
+    n_pts.append(1)
+    while lc:
+        pt_v2 = V3(*c_lst[cnt])
+        for v_idx, v in enumerate(pts):
+            dt = v.distanceToPoint(pt_v2)
+            if dt > tol:
+                pts.append(pt_v2)
+                n_pts.append(1)
+            else:
+                n_pts[v_idx] += 1
+        # print(f"cnt: {cnt}, {mn} pts: {pts} n_pts: {n_pts}\n")
+        cnt += 1
+        if cnt >= mn:
+            lc = False
+
+    s_list = list(zip(pts, n_pts))
+
+    return s_list
+
 
 # ------------------------------------------------
 #                Assembly functions
@@ -168,6 +237,22 @@ def create_assembly(doc):
     asm.newObject("Assembly::JointGroup", "Joints")
     asm.recompute()
     return asm
+
+
+def resolve_asm_ref(asm_doc, refs):
+    """Resolve the asm reference returning a face."""
+    obj_name = UtilsAssembly.getObject(refs)
+    obj_ref = UtilsAssembly.getObjsNamesAndElement(obj_name, refs[1])
+    print(f"obj_ref: {obj_ref}")
+
+    element_name = UtilsAssembly.getElementName(obj_ref[1])
+    elt_type, el_num = UtilsAssembly.extract_type_and_number(element_name)
+
+    if elt_type == "Face":
+        face = obj_name.Shape.getElement(element_name)
+        return face
+    else:
+        return None
 
 
 # ------------------------------------------------
@@ -302,7 +387,7 @@ class O2PDialog(QDialog):
         y_loc = (av_hei - w_hei) * 0.5
         # define window xLoc,yLoc,xDim,yDim
         self.setGeometry(x_loc, y_loc, w_wid, w_hei)
-        self.setWindowTitle(self.ui_title)
+        self.setWindowTitle(" ")  # MacOS has no title in some cases
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowStaysOnTopHint
         )
@@ -312,7 +397,8 @@ class O2PDialog(QDialog):
         self.lb_em = round(lb_fm.maxWidth())
 
         # Determine if we are running as a module of Robot Tools WB/TB
-        if str(MODULE_PATH.stem) == 'Robot_tools':
+        mps = str(MODULE_PATH.stem)
+        if mps == 'Robot_tools' or mps == 'Robot_test':
             self.isWBcomp = True
         else:
             self.isWBcomp = False
@@ -334,7 +420,9 @@ class O2PDialog(QDialog):
 
         mcn = 4  # fake number of column to pre adapt panel width
         row = 0
-        self.lbl_sw = cm_lbl(self, "lbl_sw", f"Build: {__build__}", self.fnt, 2)
+        self.lbl_sw = cm_lbl(
+            self, "lbl_sw",
+            f"<b>{pg_name} - {self.ui_title}</b> - Build: {__build__}", self.fnt, 0)
         self.dmw_lay.addWidget(self.lbl_sw, row, 0, 1, mcn)
 
         row += 1
@@ -355,7 +443,7 @@ class O2PDialog(QDialog):
         ma_lay = self.tabw.findChild(QObject, "l_ma")
         # ma_tab = self.tabw.findChild(QObject, "t_ma")
 
-        fcl_msg(f"isWBcomp {self.isWBcomp}\n ")  # DBG
+        # fcl_msg(f"isWBcomp {self.isWBcomp}\n ")  # DBG
 
         row = 0
 
@@ -412,6 +500,7 @@ class O2PDialog(QDialog):
             brow += 1
 
         ma_lay.addWidget(gb_bt, row, 0, 1, 4)
+
         row += 1
         
         # -- Empty Spacer --
