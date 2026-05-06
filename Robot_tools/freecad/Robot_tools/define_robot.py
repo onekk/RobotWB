@@ -828,20 +828,29 @@ class O2PDialog(QDialog):
             # one face selected, so the joint is probably the grounded one.
             chb = self.findChild(QObject, "chb_gdj")
             if chb is not None and chb.isChecked(): #old-> jn == 0:
-                # This is probably a grounded joint as it is logically the first
-                # to be set.
                 add_grounded(self.wk_asm, jnt_fc1_obj)
-                self.wk_asm.recompute()
-                # Reset the interface
-                set_wid_en(self, ("btn_jnt_s1",), True)
-                set_wid_en(self, ("chb_gdj",), False)
-                # TODO: populate the joint frame with a joint type.
-                self.add_joint2ui(jn + 2, [0, "grounded", "--", "--"])
-                # advance joint counter and reset face counter and data dict
-                self.jnt_ec += 1
+                # Reset selection state
                 self.jnt_fc = 1
                 self.jnt_meta = {}
+                set_wid_en(self, ("btn_jnt_s1",), True)
+                # refresh_joint_panel to rebuild the table ui
+                self.refresh_joints_panel()
                 return
+
+                # # This is probably a grounded joint as it is logically the first
+                # # to be set.
+                # add_grounded(self.wk_asm, jnt_fc1_obj)
+                # self.wk_asm.recompute()
+                # # Reset the interface
+                # set_wid_en(self, ("btn_jnt_s1",), True)
+                # set_wid_en(self, ("chb_gdj",), False)
+                # # TODO: populate the joint frame with a joint type.
+                # self.add_joint2ui(jn + 2, [0, "grounded", "--", "--"])
+                # # advance joint counter and reset face counter and data dict
+                # self.jnt_ec += 1
+                # self.jnt_fc = 1
+                # self.jnt_meta = {}
+                # return
             else:
                 # Emit an error as two faces are needed
                 # one face but not grounded - invalid selection
@@ -883,20 +892,30 @@ class O2PDialog(QDialog):
             j_lbl = f"rb_jnt{self.jnt_ec:02d}"  # see note above
             j_ref1 = [jnt_fc1_oref, jnt_fc1_oref]
             j_ref2 = [jnt_fc2_oref, jnt_fc2_oref]
-
-            revj = add_revolute(
-                self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)], j_lbl)
-            self.wk_asm.recompute()
+            
+            revj = add_revolute(self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)], j_lbl)
             self.add_link2FPO(revj)
-            jr1l = f"{jnt_fc1_obj.Name}.{jnt_fc1_oref}"
-            jr2l = f"{jnt_fc2_obj.Name}.{jnt_fc2_oref}"
-            self.add_joint2ui(jn + 2, [self.jnt_ec, "revolute", jr1l, jr2l])
-            # advance joint counter and reset face counter and data dict
-            self.jnt_ec += 1
+            # Reset selection state
             self.jnt_fc = 1
             self.jnt_meta = {}
             set_wid_en(self, ("btn_jnt_s1",), True)
-            set_wid_en(self, ("btn_jnt_s2",), False)
+            set_wid_en(self, ("btn_jnt_s2", "btn_jnt_add"), False)
+            # refresh the joint panel to rebuild panel ui
+            self.refresh_joints_panel()
+
+            # revj = add_revolute(
+            #     self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)], j_lbl)
+            # self.wk_asm.recompute()
+            # self.add_link2FPO(revj)
+            # jr1l = f"{jnt_fc1_obj.Name}.{jnt_fc1_oref}"
+            # jr2l = f"{jnt_fc2_obj.Name}.{jnt_fc2_oref}"
+            # self.add_joint2ui(jn + 2, [self.jnt_ec, "revolute", jr1l, jr2l])
+            # # advance joint counter and reset face counter and data dict
+            # self.jnt_ec += 1
+            # self.jnt_fc = 1
+            # self.jnt_meta = {}
+            # set_wid_en(self, ("btn_jnt_s1",), True)
+            # set_wid_en(self, ("btn_jnt_s2",), False)
         else:
             if dbg_s:
                 fcl_msg(f"-- f2 obj not found: {jnt_fc2_obj}\n")
