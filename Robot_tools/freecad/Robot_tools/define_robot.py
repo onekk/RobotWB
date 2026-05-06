@@ -826,7 +826,8 @@ class O2PDialog(QDialog):
 
         if len(dks) == 1:
             # one face selected, so the joint is probably the grounded one.
-            if jn == 0:
+            chb = self.findChild(QObject, "chb_gdj")
+            if chb is not None and chb.isChecked(): #old-> jn == 0:
                 # This is probably a grounded joint as it is logically the first
                 # to be set.
                 add_grounded(self.wk_asm, jnt_fc1_obj)
@@ -843,6 +844,9 @@ class O2PDialog(QDialog):
                 return
             else:
                 # Emit an error as two faces are needed
+                # one face but not grounded - invalid selection
+                msg_box(self, " ", self.fnt,
+                        "<b>Add Joint</b><br><br>Two faces are required for a non-grounded joint.")
                 return
 
         # At this point we could be sure that there are two objects in the list
@@ -985,13 +989,11 @@ class O2PDialog(QDialog):
         self.log_fn = pathlib.Path(MODULE_PATH.joinpath(log_fn))
         dump_log(self.log_fn)
 
-
 def run():
     dialog = O2PDialog()
     dialog.show()
 
 # Executed if not imported as module
-
 
 if __name__ == "__main__":
     dialog = O2PDialog()

@@ -78,7 +78,7 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm):
     lbl_jnt = cm_lbl(dlg, f"lbl_jnt{jr}", "", fnt, 0)
     lbl_jnt.setFrameShape(QFrame.Shape.Panel)
     lbl_jnt.setFrameShadow(QFrame.Shadow.Sunken)
-    lbl_jnt.setStyleSheet("QLabel {background-color: white;}")
+    lbl_jnt.setStyleSheet("QLabel {background-color: palette(base); color: palette(text);}")
     lbl_jnt.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(lbl_jnt, row, 1, 1, 1)
 
@@ -103,7 +103,7 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm):
     lbl_jdir = cm_lbl(dlg, f"lbl_jdir{jr}", "", fnt, 0)
     lbl_jdir.setFrameShape(QFrame.Shape.Panel)
     lbl_jdir.setFrameShadow(QFrame.Shadow.Sunken)
-    lbl_jdir.setStyleSheet("QLabel {background-color: white;}")
+    lbl_jdir.setStyleSheet("QLabel {background-color: palette(base); color: palette(text);}")
     gbx_l.addWidget(lbl_jdir, row, 6, 1, 1)
 
 
