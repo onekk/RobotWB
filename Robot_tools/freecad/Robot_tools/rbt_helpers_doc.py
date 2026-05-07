@@ -9,7 +9,7 @@ Copyright: 2026
 Licence: All right reserved
 """
 __version__ = "0.01"
-__build__ = "20260505_0828"
+__build__ = "20260507_1215"
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -21,6 +21,7 @@ fcl_warn = App.Console.PrintWarning
 V3 = App.Vector
 Rotation = App.Rotation
 Placement = App.Placement
+
 
 def clear_doc(doc_name):
     """Clear the document deleting all the objects.

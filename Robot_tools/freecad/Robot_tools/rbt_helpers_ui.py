@@ -9,7 +9,7 @@ Copyright: 2026
 Licence: All right reserved
 """
 __version__ = "0.01"
-__build__ = "20260505_0803"
+__build__ = "20260507_1213"
 
 from PySide import QtGui, QtCore  # noqa  # QtWidgets
 from PySide.QtWidgets import (  # noqa
@@ -24,6 +24,7 @@ from .rbt_constants import ap_clr
 # ------------------------------------------------
 #                   Color setters
 # ------------------------------------------------
+
 
 def set_txt_color(txt, col):
     """Set text color using html syntax."""
@@ -41,6 +42,7 @@ def set_txt_color(txt, col):
 # ------------------------------------------------
 #                   UI functions
 # ------------------------------------------------
+
 
 def cm_chb(parent, o_nm, o_txt, l_fnt, enable=True):
     """Create a styled QLabel."""
@@ -195,6 +197,7 @@ def cm_txt(parent, t_nm, t_fnt, t_hei, rich=True):
         text_f.setParent(parent)
 
     return text_f
+
 
 def get_dir(parent, fnt, pre_dir=""):
     """Get a directory from a file dialog."""

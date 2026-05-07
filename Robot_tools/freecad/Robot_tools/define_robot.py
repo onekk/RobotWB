@@ -8,8 +8,8 @@ Author: Carlo Dormeletti
 Copyright: 2026
 Licence: All right reserved
 """
-__version__ = "0.14"
-__build__ = "20260429_1534"
+__version__ = "0.15"
+__build__ = "20260507_1229"
 
 
 import sys
@@ -47,7 +47,7 @@ from freecad.Robot_tools.rbt_constants import ap_clr
 from freecad.Robot_tools.rbt_helpers_ui import (
     cm_chb, cm_gbx, cm_btn,
     cm_lbl, cm_ledit, cm_txt,
-    getObjByName,set_wid_text, set_wid_en,
+    getObjByName, set_wid_text, set_wid_en,
     msg_box, get_file, get_dir
 )
 
@@ -81,6 +81,7 @@ v0.12 - Updated to be used also in robot_test.
       - Message boxes fixed to show program name and the context.
 v0.13 - Updated program run detection logic.
 v0.14 - Added some code to analyse faces.
+v0.15 - Nishi added code.
 """
 
 fcl_err = App.Console.PrintError
@@ -422,7 +423,8 @@ class O2PDialog(QDialog):
         row = 0
         self.lbl_sw = cm_lbl(
             self, "lbl_sw",
-            f"<b>{pg_name} - {self.ui_title}</b> - Build: {__build__}", self.fnt, 0)
+            f"<b>{pg_name} - {self.ui_title}</b> - Build: {__build__}",
+            self.fnt, 0)
         self.dmw_lay.addWidget(self.lbl_sw, row, 0, 1, mcn)
 
         row += 1
@@ -461,26 +463,29 @@ class O2PDialog(QDialog):
         selection_rows = [
             # rob components file selection
             ("txt_rbnm", "btn_selrbf", "btn_sel_rbf", "Select 'Component' file",
-             "Select the FCStd file that contains the robot components.", self.set_working_model),
+             "Select the FCStd file that contains the robot components.",
+             self.set_working_model),
 
             # rob assembly file selection
-             ("txt_asnm", "btn_selasm", "btn_sel_asm", "Select 'Assembly' file",
-             "Select the FCStd file that contains Robot_Assembly and the Robot_FPO.", self.set_working_asm),
+            ("txt_asnm", "btn_selasm", "btn_sel_asm", "Select 'Assembly' file",
+             ("Select the FCStd file that contains Robot_Assembly "
+              "and Robot_FPO."),
+             self.set_working_asm),
         ]
         brow = 0
-        for txt_name, btn_name, btn_attr, btn_lbl, tool_tip, callback in selection_rows:
-            txt = cm_ledit(self, txt_name, self.fnt, 0)
+        for txt_nm, btn_nm, btn_attr, btn_lbl, btn_ttip, callback in selection_rows:
+            txt = cm_ledit(self, txt_nm, self.fnt, 0)
             gb_rcl.addWidget(txt, brow, 0, 1, 4)
-            setattr(self, txt_name, txt)
+            setattr(self, txt_nm, txt)
             brow += 1
 
-            btn = cm_btn(self, btn_name, btn_lbl, self.fnt, 0)
-            btn.setToolTip(tool_tip)
+            btn = cm_btn(self, btn_nm, btn_lbl, self.fnt, 0)
+            btn.setToolTip(btn_ttip)
             btn.clicked.connect(callback)
             gb_rcl.addWidget(btn, brow, 0, 1, 2)
             setattr(self, btn_attr, btn)
             brow += 1
-        
+
         ma_lay.addWidget(gb_rc, row, 0, 1, 4)
         row += 1
 
@@ -502,7 +507,7 @@ class O2PDialog(QDialog):
         ma_lay.addWidget(gb_bt, row, 0, 1, 4)
 
         row += 1
-        
+
         # -- Empty Spacer --
         tp_gb0, _ = _make_gbx("tp_gb0", "")
 
@@ -514,10 +519,11 @@ class O2PDialog(QDialog):
         headers = ["Joint", "Type", "Face1", "Face2"]
         brow = 0
         for header in headers:
-            lbl = cm_lbl(self, f"lbl_jnspc{brow}", f"<b>{header}</b>", self.fnt, 0)
+            lbl = cm_lbl(
+                self, f"lbl_jnspc{brow}", f"<b>{header}</b>", self.fnt, 0)
             jn_gb0l.addWidget(lbl, 0, brow, 1, 1)
             brow += 1
-        
+
         ma_lay.addWidget(jn_gb0, row, 0, 1, 4)
         row += 1
 
@@ -644,11 +650,12 @@ class O2PDialog(QDialog):
         # Data: [number, type, face1, face2]
         names = ("lbl_jnt", "lbl_jt", "lbl_jf1", "lbl_jf2")
 
-        for idx, (name,val) in enumerate(zip(names, j_data)):
+        for idx, (name, val) in enumerate(zip(names, j_data)):
             lbl = cm_lbl(self, f"{name}{jpr}", str(val), self.fnt, 0)
             lbl.setFrameShape(QFrame.Shape.Panel)
             lbl.setFrameShadow(QFrame.Shadow.Sunken)
-            lbl.setStyleSheet("QLabel {background-color: palette(base); color: palette(text);}")
+            lbl.setStyleSheet(
+                "QLabel {background-color: palette(base); color: palette(text);}")
             lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
             lay.addWidget(lbl, jpr, idx, 1, 1)
 
@@ -660,7 +667,7 @@ class O2PDialog(QDialog):
         """helper for setting robot/assm. models"""
         f_name = get_file(self, self.fnt, ftype="fcstd", pre_dir="")
         # fcl_msg(f"Set working model: {f_name}\n")
-        if not f_name: 
+        if not f_name:
             return None
         o_doc = App.openDocument(f_name)
         fcl_msg(f"open doc: {o_doc}\n")
@@ -670,10 +677,10 @@ class O2PDialog(QDialog):
             return None
         wid.setText(str(f_name))
         return o_doc
-    
+
     def _install_observer(self):
         """observer to monitor deletion events"""
-        if getattr(self,"doc_observer", None) is not None:
+        if getattr(self, "doc_observer", None) is not None:
             return
         self.doc_observer = RbtObserver(self)
 
@@ -891,9 +898,11 @@ class O2PDialog(QDialog):
         dbg_s = True  # BDG
         if dbg_s:
             fcl_msg(f"Joint meta: {self.jnt_meta}\n")
-        
+
         if not self.jnt_meta:
-            msg_box(self, " ", self.fnt, "<b>Add Joint</b><br><br>You must select at least one face first")
+            msg_box(
+                self, " ", self.fnt,
+                "<b>Add Joint</b><br><br>You must select at least one face first")
             return
 
         dks = list(self.jnt_meta)
@@ -916,7 +925,7 @@ class O2PDialog(QDialog):
         if len(dks) == 1:
             # one face selected, so the joint is probably the grounded one.
             chb = self.findChild(QObject, "chb_gdj")
-            if chb is not None and chb.isChecked(): #old-> jn == 0:
+            if chb is not None and chb.isChecked():  # old-> jn == 0:
                 add_grounded(self.wk_asm, jnt_fc1_obj)
                 # Reset selection state
                 self.jnt_fc = 1
@@ -943,8 +952,10 @@ class O2PDialog(QDialog):
             else:
                 # Emit an error as two faces are needed
                 # one face but not grounded - invalid selection
-                msg_box(self, " ", self.fnt,
-                        "<b>Add Joint</b><br><br>Two faces are required for a non-grounded joint.")
+                msg_box(
+                    self, " ", self.fnt,
+                    ("<b>Add Joint</b><br><br>Two faces are required"
+                     " for a non-grounded joint."))
                 return
 
         # At this point we could be sure that there are two objects in the list
@@ -981,8 +992,10 @@ class O2PDialog(QDialog):
             j_lbl = f"rb_jnt{self.jnt_ec:02d}"  # see note above
             j_ref1 = [jnt_fc1_oref, jnt_fc1_oref]
             j_ref2 = [jnt_fc2_oref, jnt_fc2_oref]
-            
-            revj = add_revolute(self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)], j_lbl)
+
+            revj = add_revolute(
+                self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)],
+                j_lbl)
             self.add_link2FPO(revj)
             # Reset selection state
             self.jnt_fc = 1
@@ -992,25 +1005,12 @@ class O2PDialog(QDialog):
             # refresh the joint panel to rebuild panel ui
             self.refresh_joints_panel()
 
-            # revj = add_revolute(
-            #     self.wk_asm, [(jnt_fc1_obj, j_ref1), (jnt_fc2_obj, j_ref2)], j_lbl)
-            # self.wk_asm.recompute()
-            # self.add_link2FPO(revj)
-            # jr1l = f"{jnt_fc1_obj.Name}.{jnt_fc1_oref}"
-            # jr2l = f"{jnt_fc2_obj.Name}.{jnt_fc2_oref}"
-            # self.add_joint2ui(jn + 2, [self.jnt_ec, "revolute", jr1l, jr2l])
-            # # advance joint counter and reset face counter and data dict
-            # self.jnt_ec += 1
-            # self.jnt_fc = 1
-            # self.jnt_meta = {}
-            # set_wid_en(self, ("btn_jnt_s1",), True)
-            # set_wid_en(self, ("btn_jnt_s2",), False)
         else:
             if dbg_s:
                 fcl_msg(f"-- f2 obj not found: {jnt_fc2_obj}\n")
             # emit an error?
             pass
-    
+
     def add_link2FPO(self, joint):
         """Add the joint to the FPO."""
         link_cont = self.rob_obj.Robot_joints
@@ -1061,7 +1061,8 @@ class O2PDialog(QDialog):
             #       "Linked Part container"
             # FIXME: probably an hack!
             # UPDATE: Using get components reference of assembly wb //NISHI
-            link_obj, face_ref = UtilsAssembly.getComponentReference(self.wk_asm, obj, sub_ent[0])
+            link_obj, face_ref = UtilsAssembly.getComponentReference(
+                self.wk_asm, obj, sub_ent[0])
 
             if link_obj is None:
                 msg_box(
@@ -1097,11 +1098,13 @@ class O2PDialog(QDialog):
         self.log_fn = pathlib.Path(MODULE_PATH.joinpath(log_fn))
         dump_log(self.log_fn)
 
+
 def run():
     dialog = O2PDialog()
     dialog.show()
 
 # Executed if not imported as module
+
 
 if __name__ == "__main__":
     dialog = O2PDialog()
