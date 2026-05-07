@@ -1,3 +1,10 @@
+""" Robot_tools Custom TB
+
+Author: Carlo Dormeletti and Nishendra Singh
+Copyright: 2026
+Licence: LGPL 2.1
+"""
+
 import os
 import FreeCADGui as Gui
 from importlib import import_module, reload
