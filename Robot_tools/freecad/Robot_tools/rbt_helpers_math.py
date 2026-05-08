@@ -4,16 +4,17 @@ Name: rbt_helpers_math.py
 
 See Changelog below.
 
-Author: Nishendra Singh
+Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
-Licence: All right reserved
+Licence:  LGPL 2.1
 """
 __version__ = "0.01"
-__build__ = "20260505_0828"
+__build__ = "20260507_1255"
 
 # ------------------------------------------------
 #               Service functions
 # ------------------------------------------------
+
 
 def roundvec(r_vec, prec=6):
     """Round value in vectors."""

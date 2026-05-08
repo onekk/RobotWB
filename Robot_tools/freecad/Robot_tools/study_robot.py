@@ -1,6 +1,6 @@
-"""Robot Test.
+""" Robot_tools Custom TB
 
-Name: study_asm.py
+Name: study_robot.py
 
 See Changelog before import statements.
 
@@ -9,7 +9,7 @@ Copyright: 2026
 Licence: All right reserved
 """
 __version__ = "0.18"
-__build__ = "20260415_1204"
+__build__ = "20260507_1307"
 
 
 import pathlib

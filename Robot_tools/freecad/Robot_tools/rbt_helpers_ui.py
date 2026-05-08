@@ -4,12 +4,12 @@ Name: rbt_helpers_ui.py
 
 See Changelog below.
 
-Author: Nishendra Singh
+Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
-Licence: All right reserved
+Licence: LGPL 2.1
 """
 __version__ = "0.01"
-__build__ = "20260505_0803"
+__build__ = "20260507_1256"
 
 from PySide import QtGui, QtCore  # noqa  # QtWidgets
 from PySide.QtWidgets import (  # noqa
@@ -25,6 +25,7 @@ from .rbt_constants import ap_clr
 # ------------------------------------------------
 #                   Color setters
 # ------------------------------------------------
+
 
 def set_txt_color(txt, col):
     """Set text color using html syntax."""
@@ -42,6 +43,7 @@ def set_txt_color(txt, col):
 # ------------------------------------------------
 #                   UI functions
 # ------------------------------------------------
+
 
 def cm_chb(parent, o_nm, o_txt, l_fnt, enable=True):
     """Create a styled QLabel."""

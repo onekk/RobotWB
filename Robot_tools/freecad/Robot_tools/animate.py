@@ -4,12 +4,15 @@ Name: animator.py
 
 See Changelog after import statements.
 
-Author: Carlo Dormeletti
+Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
-Licence: All right reserved
+Licence: LGPL 2.1
 """
-__version__ = "0.05"
-__build__ = "20260411_1919"
+__version__ = "0.07"
+__build__ = "20260507_1256"
+
+
+import pathlib
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -44,16 +47,36 @@ from freecad.Robot_tools.rbt_helpers_math import roundrot, roundvec
 ----------------------------------------
 Changelog:
 ----------------------------------------
-v0.02 - converted to make it compatible with the WB and the FPO.
-v0.03 - added direction field from FPO.
-v0.04 - some improvements.
-v0.05 - reworked 'Reload FPO Data' button to avoid unknown problem that causes
+v0.02 - Converted to make it compatible with the WB and the FPO.
+v0.03 - Added direction field from FPO.
+v0.04 - Some improvements.
+v0.05 - Reworked 'Reload FPO Data' button to avoid unknown problem that causes
         a buggy  movement commands (it don't honour the steps)
+v0.06 - Starting to adapt to the robot_FPO
+v0.07 - Some hacks to reset the touched overlay icon. Added a check of joints
+        dir data, to avoid initialization error.
+v0.09 - Modded to work on robot_test too.
+      - Some fixes in logic if no Robot_FPO is selected.
+      - Message boxes fixed to show program name and the context.
 """
 
 fcl_err = App.Console.PrintError
 fcl_msg = App.Console.PrintMessage
 fcl_warn = App.Console.PrintWarning
+
+
+MODULE_PATH = pathlib.Path(__file__).parent
+
+if str(MODULE_PATH.stem) == "Robot_test":
+    pg_name = "Robot test"
+    fcl_msg("Running on Robot Test\n")
+elif str(MODULE_PATH.stem) == "Robot_tools":
+    pg_name = "Robot Tools"
+    fcl_msg("Running on Robot Tools\n")
+else:
+    pg_name = "Standalone"
+    fcl_msg("Running from command line\n")
+
 
 V3 = App.Vector
 Rotation = App.Rotation
