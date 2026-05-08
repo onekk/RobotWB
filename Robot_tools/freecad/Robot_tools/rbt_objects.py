@@ -8,8 +8,8 @@ Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
 Licence: LGPL 2.1
 """
-__version__ = "0.02"
-__build__ = "20260507_1256"
+__version__ = "0.03"
+__build__ = "20260508_1337"
 
 import FreeCADGui as Gui
 import FreeCAD as App
@@ -52,19 +52,55 @@ class Robot_obj:
         obj.addProperty(
             "App::PropertyFile", "STEPFile", "General",
             "File from where elements have been loaded.")
+        # Added a Version property
+        obj.addProperty(
+            "App::PropertyString", "Version", "Base",
+            "Object version")
+        obj.Version = "0.01"
+
         obj.addProperty(
             "App::PropertyFloatList", "Robot_home_pos", "Robot",
             "Robot home position angles")
 
         obj.Proxy = self
 
+    def _migrate_from_001(self, obj):
+        """Migrate from version 0.01"""
+        fcl_msg("Migrating FPO to v0.02\n")  # DBG
+
+    def _migrate_from_002(self, obj):
+        """Migrate from version 0.02"""
+        fcl_msg("Migrating FPO to v0.03\n")  # DBG
+
     def onChanged(self, fp, prop):
         '''Do something when a property has changed'''
         fcl_msg("Change property: " + str(prop) + "\n")
 
+    def onDocumentRestored(self, obj):
+        if hasattr(obj, "Version") and obj.Version:
+            fcl_msg("FPO version check\n")  # DBG
+            if obj.Version == "0.01":
+                fcl_msg("FPO is already at v0.01\n")  # DBG
+                pass  # do nothing
+            if obj.Version == "0.02":
+                self._migrate_from_001(obj)
+            elif obj.Version == "0.03":
+                self._migrate_from_002(obj)
+        else:
+            fcl_msg("FPO has no version bumping to v0.01\n")  # DBG
+            obj.addProperty(
+                "App::PropertyString", "Version", "Base",
+                "Object version")
+            obj.Version = "0.01"
+
+            if not hasattr(obj, "Robot_home_pos"):
+                obj.addProperty(
+                    "App::PropertyFloatList", "Robot_home_pos", "Robot",
+                    "Robot home position angles")
+
     def execute(self, fp):
         '''Do something when doing a recomputation, this method is mandatory'''
-        fcl_msg("Execute reached\n")
+        fcl_msg("Execute reached\n")  # DBG
         #
         fp.recompute()
 

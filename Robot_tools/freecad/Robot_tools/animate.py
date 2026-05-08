@@ -9,7 +9,7 @@ Copyright: 2026
 Licence: LGPL 2.1
 """
 __version__ = "0.07"
-__build__ = "20260507_1256"
+__build__ = "20260508_1245"
 
 
 import pathlib
@@ -105,7 +105,7 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm, low, hi, sl_scale=1):
     gbx_l.addWidget(lbl_jnt, row, 0, 1, 1)
 
     # Col 1 : Angle Spinbox for manual edits
-    dspb_jnt  = cm_dspb(dlg, f"dspb_jnt{jr}", fnt, sb_min=low, sb_max=hi)
+    dspb_jnt = cm_dspb(dlg, f"dspb_jnt{jr}", fnt, sb_min=low, sb_max=hi)
     dspb_jnt.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(dspb_jnt, row, 1, 1, 1)
 
@@ -115,7 +115,8 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm, low, hi, sl_scale=1):
 
     # Col 3 : Angle reducing nudger
     btn_jnt_m = cm_btn(dlg, f"btn_jnt_m{jr}", "❮", fnt, 0)
-    btn_jnt_m.setFixedWidth(22) # setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+    btn_jnt_m.setFixedWidth(22)
+    # was: setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(btn_jnt_m, row, 3, 1, 1)
 
     # Col 4 : Angle Slider
@@ -124,7 +125,8 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm, low, hi, sl_scale=1):
 
     # col 5 : Angle increasing nudger
     btn_jnt_p = cm_btn(dlg, f"btn_jnt_p{jr}", "❯", fnt, 0)
-    btn_jnt_p.setFixedWidth(22) # setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+    btn_jnt_p.setFixedWidth(22)
+    # was: setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(btn_jnt_p, row, 5, 1, 1)
 
     # col 6 : max limit label
@@ -182,10 +184,10 @@ class AnimationController:
     def __init__(self, robot_obj):
         self.robot = robot_obj
         joints = robot_obj.Robot_joints
-        self.j_num = len(joints) # number of jonits
-        self.j_nms = [f"Joint{n + 1:02d}" for n in range (self.j_num)] # joint names
-        self.j_step = 1.0 # step increment size for angles
-        self.j_vals = [0.0] * self.j_num # joint values
+        self.j_num = len(joints)  # number of jonits
+        self.j_nms = [f"Joint{n + 1:02d}" for n in range(self.j_num)]  # joint names
+        self.j_step = 1.0  # step increment size for angles
+        self.j_vals = [0.0] * self.j_num  # joint values
 
         # default vals if no <<Robot_joints_dir>> yet
         if not robot_obj.Robot_joints_dir:
@@ -205,14 +207,13 @@ class AnimationController:
             robot_obj.Robot_home_pos = self.j_vals
         self.j_home = list(robot_obj.Robot_home_pos)
 
-    
     # helpers
 
     def get_joint_limits(self, j_idx):
         """Returns (min, max) range for current angle"""
         jnt = self.robot.Robot_joints[j_idx]
-        low = jnt.AngleMin if getattr(jnt,"EnableAngleMin", False) else -180
-        high = jnt.AngleMax if getattr(jnt,"EnableAngleMax", False) else 180
+        low = jnt.AngleMin if getattr(jnt, "EnableAngleMin", False) else -180
+        high = jnt.AngleMax if getattr(jnt, "EnableAngleMax", False) else 180
         return float(low), float(high)
 
     # robot state mutations
