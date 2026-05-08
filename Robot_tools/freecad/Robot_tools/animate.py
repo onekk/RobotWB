@@ -20,18 +20,16 @@ import JointObject
 
 from PySide import QtGui, QtCore  # noqa  # QtWidgets
 from PySide.QtWidgets import (  # noqa
-    QApplication, QCheckBox, QFrame, QGroupBox, QLabel, QLineEdit, QPushButton,
-    QSpinBox, QTextEdit,  # Widgets
-    QDialog, QFileDialog, QInputDialog, QMessageBox,  # Dialogs
-    QGridLayout, QVBoxLayout, QSizePolicy)  # Layouts and Policy
-
-from PySide.QtCore import QObject, Qt  # noqa
+    QApplication,  QFrame, QGroupBox, QLabel,
+    QHBoxLayout,  QGridLayout,  QSizePolicy)  # Layouts and Policy
 
 from freecad.Robot_tools.rbt_constants import ap_clr
 
 from freecad.Robot_tools.rbt_helpers_ui import (
     cm_chb, cm_gbx, cm_btn,
     cm_lbl, cm_ledit, cm_txt,
+    cm_dspb, cm_slider, cm_toggle,
+    cm_scroll,
     getObjByName,set_wid_text, set_wid_en,
     msg_box, get_file, get_dir
 )
@@ -70,41 +68,49 @@ ROT0 = Rotation(0, 0, 0)
 # ------------------------------------------------
 
 
-def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm):
+def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm, low, hi, sl_scale=1):
     """Create a link of buttons for a link."""
-    txt_wd = cm_lbl(dlg, f"lbl_j{jr}", joint_nm, fnt, 0)
-    gbx_l.addWidget(txt_wd, row, 0, 1, 1)
+    # txt_wd = cm_lbl(dlg, f"lbl_j{jr}", joint_nm, fnt, 0)
+    # gbx_l.addWidget(txt_wd, row, 0, 1, 1)
 
+    # Col 0 : Joint label
     lbl_jnt = cm_lbl(dlg, f"lbl_jnt{jr}", "", fnt, 0)
     lbl_jnt.setFrameShape(QFrame.Shape.Panel)
     lbl_jnt.setFrameShadow(QFrame.Shadow.Sunken)
     lbl_jnt.setStyleSheet("QLabel {background-color: palette(base); color: palette(text);}")
     lbl_jnt.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
-    gbx_l.addWidget(lbl_jnt, row, 1, 1, 1)
+    gbx_l.addWidget(lbl_jnt, row, 0, 1, 1)
 
-    txt_jnta = cm_ledit(dlg, f"txt_jnta{jr}", fnt, 0)
-    txt_jnta.setReadOnly(True)
-    gbx_l.addWidget(txt_jnta, row, 2, 1, 1)
+    # Col 1 : Angle Spinbox for manual edits
+    dspb_jnt  = cm_dspb(dlg, f"dspb_jnt{jr}", fnt, sb_min=low, sb_max=hi)
+    dspb_jnt.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+    gbx_l.addWidget(dspb_jnt, row, 1, 1, 1)
 
-    btn_jnt_m = cm_btn(dlg, f"btn_jnt_m{jr}", "-", fnt, 0)
-    btn_jnt_m.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
-    btn_jnt_m.setMinimumWidth(30)
+    # Col 2 : Min limit label
+    lbl_jmin = cm_lbl(dlg, f"lbl_jmin{jr}", f"{low:g}°", fnt, 0, l_aln=2)
+    gbx_l.addWidget(lbl_jmin, row, 2, 1, 1)
+
+    # Col 3 : Angle reducing nudger
+    btn_jnt_m = cm_btn(dlg, f"btn_jnt_m{jr}", "❮", fnt, 0)
+    btn_jnt_m.setFixedWidth(22) # setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(btn_jnt_m, row, 3, 1, 1)
 
-    btn_jnt_p = cm_btn(dlg, f"btn_jnt_p{jr}", "+", fnt, 0)
-    btn_jnt_p.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
-    btn_jnt_p.setMinimumWidth(30)
-    gbx_l.addWidget(btn_jnt_p, row, 4, 1, 1)
+    # Col 4 : Angle Slider
+    sl_jnt = cm_slider(dlg, f"sl_jnt{jr}", sl_min=low, sl_max=hi)
+    gbx_l.addWidget(sl_jnt, row, 4, 1, 1)
 
-    txt_jnts = cm_ledit(dlg, f"txt_jnts{jr}", fnt, 0)
-    txt_jnts.setReadOnly(True)
-    gbx_l.addWidget(txt_jnts, row, 5, 1, 1)
+    # col 5 : Angle increasing nudger
+    btn_jnt_p = cm_btn(dlg, f"btn_jnt_p{jr}", "❯", fnt, 0)
+    btn_jnt_p.setFixedWidth(22) # setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+    gbx_l.addWidget(btn_jnt_p, row, 5, 1, 1)
 
-    lbl_jdir = cm_lbl(dlg, f"lbl_jdir{jr}", "", fnt, 0)
-    lbl_jdir.setFrameShape(QFrame.Shape.Panel)
-    lbl_jdir.setFrameShadow(QFrame.Shadow.Sunken)
-    lbl_jdir.setStyleSheet("QLabel {background-color: palette(base); color: palette(text);}")
-    gbx_l.addWidget(lbl_jdir, row, 6, 1, 1)
+    # col 6 : max limit label
+    lbl_jmax = cm_lbl(dlg, f"lbl_jmax{jr}", f"{hi:g}°", fnt, 0)
+    gbx_l.addWidget(lbl_jmax, row, 6, 1, 1)
+
+    # col 7 — flip toggle (checked == reversed direction)
+    chk_flip = cm_toggle(dlg, f"chk_flip{jr}", fnt)
+    gbx_l.addWidget(chk_flip, row, 7, 1, 1)
 
 
 def print_joints(obj):
@@ -143,17 +149,131 @@ def find_joint(obj, name):
     return None
 
 
-class O2PDialog(QDialog):
-    """Show a dialog for RobotAnimator."""
+# ---------------------------------------------
+#             App Layer 
+# ---------------------------------------------
+
+class AnimationController:
+    """Core app logic for robot FPO interaction"""
+
+    def __init__(self, robot_obj):
+        self.robot = robot_obj
+        joints = robot_obj.Robot_joints
+        self.j_num = len(joints) # number of jonits
+        self.j_nms = [f"Joint{n + 1:02d}" for n in range (self.j_num)] # joint names
+        self.j_step = 1.0 # step increment size for angles
+        self.j_vals = [0.0] * self.j_num # joint values
+
+        # default vals if no <<Robot_joints_dir>> yet
+        if not robot_obj.Robot_joints_dir:
+            robot_obj.Robot_joints_dir = [1] * self.j_num
+        self.j_dirs = list(robot_obj.Robot_joints_dir)
+
+        # if not hasattr(robot_obj, "Robot_home_pos"):
+        #     robot_obj.addProperty(
+        #         "App::PropertyFloatList", "Robot_home_pos", "Robot",
+        #         "Robot home pose (one angle per joint)")
+        # if not robot_obj.Robot_home_pos:
+        #     robot_obj.Robot_home_pos = list(self.j_vals)
+        # self.j_home = list(robot_obj.Robot_home_pos)
+
+        # init home pose if it exists
+        if not robot_obj.Robot_home_pos:
+            robot_obj.Robot_home_pos = self.j_vals
+        self.j_home = list(robot_obj.Robot_home_pos)
+
+    
+    # helpers
+
+    def get_joint_limits(self, j_idx):
+        """Returns (min, max) range for current angle"""
+        jnt = self.robot.Robot_joints[j_idx]
+        low = jnt.AngleMin if getattr(jnt,"EnableAngleMin", False) else -180
+        high = jnt.AngleMax if getattr(jnt,"EnableAngleMax", False) else 180
+        return float(low), float(high)
+
+    # robot state mutations
+
+    def set_joint_angle(self, j_idx, value):
+        """Sets joint angle to given value"""
+        joint = self.robot.Robot_joints[j_idx]
+        angle = value * self.j_dirs[j_idx]  # flip ccw/cw if checkbox enabled
+        joint.Offset2 = Placement(VEC0, Rotation(angle, 0, 0))
+        joint.recompute()
+
+    def set_joint_angle_clamped(self, j_idx, value):
+        """Checks joint limits before setting joint angles"""
+        low, high = self.get_joint_limits(j_idx)
+        value = max(low, min(high, value))
+        self.j_vals[j_idx] = value
+        self.set_joint_angle(j_idx, value)
+        return value
+    
+    def step_joint(self, j_idx, sign):
+        """increment joint and return the value"""
+        incr = sign * self.j_step
+        new_val = self.j_vals[j_idx] + incr
+        self.j_vals[j_idx] = new_val
+        self.set_joint_angle_clamped(j_idx, new_val)
+        return new_val
+    
+    def save_home_pos(self):
+        """Saves the curr pose as home position"""
+        self.j_home = list(self.j_vals)
+        self.robot.Robot_home_pos = self.j_home
+
+    def go_home_pos(self):
+        """Set home pos joint angle values"""
+        for idx, val in enumerate(self.j_home):
+            self.set_joint_angle_clamped(idx, val)
+
+    
+    def reset_joints(self):
+        """reset joints to original val"""
+        asm = self.robot.Robot_assembly
+        if asm is None: return
+
+        for n, jnt in enumerate(self.robot.Robot_joints):
+            jnt.Offset2 = Placement(VEC0, Rotation())
+            self.j_vals[n] = 0.0
+        asm.recompute()
+    
+    def set_initial_pose(self):
+        """force apply offset2 with recompute-twice trick"""
+        asm = self.robot.Robot_assembly
+        for jnt in self.robot.Robot_joints:
+            of2 = jnt.Offset2
+            jnt.Offset2 = Placement(VEC0, Rotation(1,0,0)).multiply(of2)
+            asm.recompute()
+            jnt.Offset2 = of2
+            asm.recompute()
+
+    def reload_dirs(self):
+        """reload joints directory"""
+        self.j_dirs = list(self.robot.Robot_joints_dir)
+
+    # debug
+
+    def debug_dump_state(self, op_nm):
+        fcl_msg(
+            f"----- {op_nm} -----\n"
+            f"- j_num : {self.j_num}\n"
+            f"- j_dirs: {self.j_dirs}\n"
+            f"- j_nms : {self.j_nms}\n"
+            f"- j_step: {self.j_step}\n"
+            f"- j_vals: {self.j_vals}\n"
+            "--------------------------------\n"
+        )
+    
+
+
+# ---------------------------------------------
+#             GUI Layer 
+# ---------------------------------------------
+
+class AnimationTaskPanel:
+    """Task panel for Robot Animator."""
     #
-    rob_obj = None
-    # Default values for testing, assigned in set_working_robot.
-    j_num = 0
-    j_dirs = []
-    j_nms = []
-    j_step = []
-    j_vals = []
-    doc_obj_nm = ""
     grb_ss = (
         ""
         "QGroupBox{"
@@ -165,176 +285,210 @@ class O2PDialog(QDialog):
     wrl_file = None
     csv_file = None
 
-    def __init__(self, parent=Gui.getMainWindow()):
-        """Canonical Init."""
-        super().__init__(parent)
+    def __init__(self, robot_obj):
+        """Canonical Init & set robot obj"""
+        self.robot = robot_obj
         self.initUI()
 
     def initUI(self):
         """Init UI."""
         global work_dir
-        # get dimensions for available space on screen
-        av_wid = QtGui.QGuiApplication.primaryScreen().availableGeometry().width()
-        av_hei = QtGui.QGuiApplication.primaryScreen().availableGeometry().height()
-        w_wid = av_wid * 0.25
-        w_hei = av_hei * 0.50
-        x_loc = (av_wid - w_wid) * 0.5
-        y_loc = (av_hei - w_hei) * 0.5
-        # define window xLoc,yLoc,xDim,yDim
-        self.setGeometry(x_loc, y_loc, w_wid, w_hei)
-        self.setWindowTitle(f"Robot Move - b{__build__}")
-        self.setWindowFlags(
-            self.windowFlags() | Qt.WindowStaysOnTopHint
-        )
-
+        
         fnt = QApplication.font("QMessageBox")
         self.fnt = fnt
-        self.form_lay = QGridLayout(self)
+        self.form = QtGui.QWidget()
+        self.form.setWindowTitle("Robot Animator")
+        self.form.setObjectName("RobotAnimationPanel")
+        
+        self.form_lay = QGridLayout(self.form)
 
+
+        obj = self.robot
         row = 0
-        raw_sel = Gui.Selection.getSelection("", 2, True)
-        esn = len(raw_sel)
-
-        if esn == 0:
-            msg_box(
-                self, "Robot", self.fnt,
-                "<b>Robot Selection</b><br><br>You must select a Robot FPO")
-            return
-        elif esn == 1:
-            obj = raw_sel[0]
-            obj_typ = obj.TypeId
-            # fcl_msg(f"Object Name: {obj.Name[:9]}\n")
-            if obj_typ == "App::FeaturePython" and obj.Name[:9] == "Robot_FPO":
-                # fcl_msg("Robot OBJ OK\n")
-                lbl_rob_id = cm_lbl(self, "lbl_rob_id", f"<b>{obj.Name}</b>", self.fnt, 0)
-                self.form_lay.addWidget(lbl_rob_id, row, 0, 1, 4)
-                row += 1
-                self.rob_obj = obj
-                self.set_working_rbt()
-                tp_gb0 = self.create_joint_ui()
-                self.form_lay.addWidget(tp_gb0, row, 0, 1, 4)
-                self.read_joints_data()
-                switch_document(obj.Document.Name)
-                self.set_pose()
-                self.set_defaults()
-            else:
-                msg_box(
-                    self, "Robot", self.fnt,
-                    "<b>Robot Selection</b><br><br>You must select a Robot FPO")
-                # FIXME: close the dialog?
-                # NOTE:  it seems OK to simply return!
-                return
-
+        lbl_rob_id = cm_lbl(self.form, "lbl_rob_id", f"<b>{obj.Name}</b>", self.fnt, 0)
+        self.form_lay.addWidget(lbl_rob_id, row, 0, 1, 4)
+        row += 1
+        self.ctrl = AnimationController(obj)
+        tp_gb0 = self.create_joint_ui()
+        # wrap in a scrollable area
+        scroll = cm_scroll(self.form, "tp_gb0_scroll", tp_gb0)
+        self.form_lay.addWidget(scroll, row, 0, 1, 4)
+        #self.form_lay.addWidget(tp_gb0, row, 0, 1, 4)
+        self.read_joints_data()
+        switch_document(obj.Document.Name)
+        self.ctrl.set_initial_pose()
+        self.set_defaults()
         row += 1
         self.form_lay.setRowStretch(row, 1)
-        self.show()
-
+    
     def create_joint_ui(self):
         """Create Joint UI."""
-        tp_gb0, tp_gb0l = cm_gbx(self, "tp_gb0", "Control")
+        tp_gb0, tp_gb0l = cm_gbx(self.form, "tp_gb0", "Joint Axes Jog")
         tp_gb0.setStyleSheet(self.grb_ss)
 
-        lbl_1_wd = cm_lbl(self, "lbl_c0", "<b>Joint</b>", self.fnt, 0)
-        tp_gb0l.addWidget(lbl_1_wd, 0, 0, 1, 1)
+        # -- Header Row --
+        lbl_h0 = cm_lbl(self.form, "lbl_h0", "<b>Axis</b>", self.fnt, 1)
+        tp_gb0l.addWidget(lbl_h0, 0, 0, 1, 1)
+        
+        lbl_h1 = cm_lbl(self.form, "lbl_h1", "<b>Angle</b>", self.fnt, 1, l_aln=1)
+        tp_gb0l.addWidget(lbl_h1, 0, 1, 1, 1)
 
-        lbl_2_wd = cm_lbl(self, "lbl_c1", "<b>Joint name</b>", self.fnt, 0)
-        tp_gb0l.addWidget(lbl_2_wd, 0, 1, 1, 1)
+        lbl_h2 = cm_lbl(self.form, "lbl_h2", "<b>Position</b>", self.fnt, 1, l_aln=1)
+        tp_gb0l.addWidget(lbl_h2, 0, 2, 1, 5)
 
-        lbl_3_wd = cm_lbl(self, "lbl_c2", "<b>Angle</b>", self.fnt, 0)
-        tp_gb0l.addWidget(lbl_3_wd, 0, 2, 1, 1)
+        lbl_h3 = cm_lbl(self.form, "lbl_h3", "<b>Flip</b>", self.fnt, 1, l_aln=1)
+        tp_gb0l.addWidget(lbl_h3, 0, 7, 1, 1)
 
-        lbl_4_wd = cm_lbl(self, "lbl_c3", "<b>Decrease</b>", self.fnt, 0)
-        tp_gb0l.addWidget(lbl_4_wd, 0, 3, 1, 1)
 
-        lbl_4_wd = cm_lbl(self, "lbl_c4", "<b>Increase</b>", self.fnt, 0)
-        tp_gb0l.addWidget(lbl_4_wd, 0, 4, 1, 1)
-
-        lbl_5_wd = cm_lbl(self, "lbl_c5", "<b>Step</b>", self.fnt, 0)
-        tp_gb0l.addWidget(lbl_5_wd, 0, 5, 1, 1)
-
-        lbl_6_wd = cm_lbl(self, "lbl_c6", "<b>Dir</b>", self.fnt, 0)
-        tp_gb0l.addWidget(lbl_6_wd, 0, 6, 1, 1)
-
+        # -- Joint Rows --
         brow = 1
-
-        for idx, jnm in enumerate(self.j_nms):
-            create_link_row(self, tp_gb0l, brow, self.fnt, f"{idx + 1:02d}", jnm)
+        for idx, jnm in enumerate(self.ctrl.j_nms):
+            low, hi = self.ctrl.get_joint_limits(idx)
+            create_link_row(self.form, tp_gb0l, brow, self.fnt, 
+                            f"{idx + 1:02d}", jnm, low, hi)
             brow += 1
-
+        
+        # -- one row gap -- 
         brow += 1
-        # Service buttons: (Reset joints)
-        btn_jnts_res = cm_btn(self, "btn_jnts_res", "Reset Joints", self.fnt, 0)
-        tp_gb0l.addWidget(btn_jnts_res, brow, 0, 1, 2)
 
-        btn_jnts_res.clicked.connect(self.reset_joints)
+        # -- bottom row btns --
+        tb_lay = QHBoxLayout()
+        tb_lay.setContentsMargins(0, 0, 0, 0)
 
-        btn_jnts_rld = cm_btn(self, "btn_jnts_rld", "Reload FPO Data", self.fnt, 0)
+        lbl_step = cm_lbl(self.form, "lbl_step", "<b>Step</b>", self.fnt, 1)
+        tb_lay.addWidget(lbl_step)
+
+        # entry box to set step size
+        dspb_step = cm_dspb(self.form, "dspb_step", self.fnt,
+                            sb_min=0.01, sb_max=90.0, sb_dec=2, sb_step=0.1)
+        dspb_step.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+        dspb_step.setValue(self.ctrl.j_step)
+        tb_lay.addWidget(dspb_step)
+
+        # push the rest to the right
+        tb_lay.addStretch(1)        
+
+        # home pos buttons
+        btn_home_go  = cm_btn(self.form, "btn_home_go",  "Go Home",  self.fnt, 0)
+        btn_home_set = cm_btn(self.form, "btn_home_set", "Set Home", self.fnt, 0)
+        tb_lay.addWidget(btn_home_go)
+        tb_lay.addWidget(btn_home_set)
+
+        # spacing
+        tb_lay.addSpacing(12)
+
+        # reset and reload FPO buttons
+        btn_jnts_res = cm_btn(self.form, "btn_jnts_res", "Reset",  self.fnt, 0)
+        btn_jnts_rld = cm_btn(self.form, "btn_jnts_rld", "Reload FPO", self.fnt, 0)
         btn_jnts_rld.setToolTip("Reload FPO data ('joints directions')")
-        tp_gb0l.addWidget(btn_jnts_rld, brow, 2, 1, 2)
+        tb_lay.addWidget(btn_jnts_res)
+        tb_lay.addWidget(btn_jnts_rld)
 
-        btn_jnts_rld.clicked.connect(self.reload_fpo_data)
+        tp_gb0l.addLayout(tb_lay, brow, 0, 1, 8)
 
-        btn_dbg_div = cm_btn(self, "btn_dbg_div", "Dbg IntVar", self.fnt, 0)
-        tp_gb0l.addWidget(btn_dbg_div, brow, 4, 1, 2)
+        # buttons connections
+        btn_jnts_res.clicked.connect(self._on_reset_joints)
+        btn_jnts_rld.clicked.connect(self._on_reload_dirs)
+        btn_home_go.clicked.connect(self._on_go_home)
+        btn_home_set.clicked.connect(self._on_set_home)
+        dspb_step.valueChanged.connect(self._on_step_changed)
 
-        btn_dbg_div.clicked.connect(self.dump_intvar)
+        # debug button on its own row
+        # brow += 1
+        # btn_dbg_div = cm_btn(self.form, "btn_dbg_div", "Dbg IntVar", self.fnt, 0)
+        # btn_dbg_div.clicked.connect(self._on_debug_dump)
+        # tp_gb0l.addWidget(btn_dbg_div, brow, 0, 1, 2)
 
-        tp_gb0l.setColumnStretch(0, 1)
-        tp_gb0l.setColumnStretch(1, 3)
-        tp_gb0l.setColumnStretch(2, 1)
-        tp_gb0l.setColumnStretch(3, 0)
-        tp_gb0l.setColumnStretch(4, 0)
-        tp_gb0l.setColumnStretch(5, 1)
-        tp_gb0l.setColumnStretch(6, 1)
+        # column stretch handler
+        # only let the slider increase in size
+        for c in (0, 1, 2, 3, 5, 6, 7):
+            tp_gb0l.setColumnStretch(c, 0)
+        tp_gb0l.setColumnStretch(4, 1)
 
         tp_gb0.setLayout(tp_gb0l)
-
         return tp_gb0
 
-    def change_angle(self, dbg_s=False):
-        dbg_s = True  # DBG
-        call_id = self.sender().objectName()
-        # fcl_msg(f"{call_id} button clicked")  # DBG
+    def refresh_row(self, j_idx, value, skip=None):
+        """reloads the row based on current state"""
+        nm = f"{j_idx + 1:02d}"
+        if skip != "dspb":
+            sb = getObjByName(self.form, f"dspb_jnt{nm}")
+            if sb is not None:
+                sb.blockSignals(True); sb.setValue(value); sb.blockSignals(False)
+        if skip != "slider":
+            sl = getObjByName(self.form, f"sl_jnt{nm}")
+            if sl is not None:
+                sl.blockSignals(True)
+                sl.setValue(int(value * sl._scale))
+                sl.blockSignals(False)
 
-        wid = self.findChild(QGroupBox, "tp_gb0_wd")
-        idx = int(call_id[-2:])
-        obj = getObjByName(wid, f"txt_jnta{call_id[-2:]}")
-        c_dir = 1 if call_id[-3:-2] == 'p' else -1
-        if obj is not None:
-            j_idx = idx - 1
-            dir = c_dir * self.j_dirs[j_idx]
-            step = self.j_step[j_idx]
-            incr = dir * step
-            if dbg_s:
-                fcl_msg(f"j_vals prior: {self.j_vals[j_idx]}\n")
-                fcl_msg(f"dir * step: {incr}\n")
-            new_val = self.j_vals[j_idx] + incr
-            self.j_vals[j_idx] = new_val
-            obj.setText(str(new_val))
-            if dbg_s:
-                fcl_msg(f"j_vals after: {self.j_vals[j_idx]}\n")
-            self.setJointAngle(j_idx, new_val, dbg_s)
-            #
-            if dbg_s:
-                msg = (
-                    f"----- {call_id} Id: {idx} dir: {c_dir}-----\n"
-                    f"- step: {step} dir: {dir}\n"
-                    f"- value: {new_val} incr: {incr}\n"
-                    f"- j_vals: {self.j_vals}\n"
-                )
-                fcl_msg(msg)
+    # --------------------------------------------
+    #         control button wrappers
+    # --------------------------------------------
 
+    def _on_step(self, j_idx, sign):
+        new_val = self.ctrl.step_joint(j_idx, sign)
+        self.refresh_row(j_idx, new_val)
+    
+    def _on_reset_joints(self):
+        self.ctrl.reset_joints()
+        for j_n in range(self.ctrl.j_num):
+            self.refresh_row(j_n, 0.0)
+    
+    def _on_reload_dirs(self):
+        self.ctrl.reload_dirs()
+        for j_n in range(self.ctrl.j_num):
+            ck = getObjByName(self.form, f"chk_flip{j_n + 1:02d}")
+            if ck is not None:
+                ck.blockSignals(True)
+                ck.setChecked(self.ctrl.j_dirs[j_n] == -1)
+                ck.blockSignals(False)
+    
+    def _on_debug_dump(self):
+        self.ctrl.debug_dump_state("Dbg Values")
+
+    def _on_spin(self, j_idx, value):
+        new_val = self.ctrl.set_joint_angle_clamped(j_idx, value)
+        self.refresh_row(j_idx, new_val, skip="dspb")
+
+    def _on_slider(self, j_idx, raw):
+        sl = getObjByName(self.form, f"sl_jnt{j_idx + 1:02d}")
+        new_val = self.ctrl.set_joint_angle_clamped(j_idx, raw / sl._scale)
+        self.refresh_row(j_idx, new_val, skip="slider")
+
+    def _on_flip(self, j_idx, checked):
+        self.ctrl.j_dirs[j_idx] = -1 if checked else 1
+        dirs = list(self.robot.Robot_joints_dir)   # mirror to FPO so it persists
+        dirs[j_idx] = self.ctrl.j_dirs[j_idx]
+        self.robot.Robot_joints_dir = dirs
+        # reapply angle on flip
+        #self.ctrl.set_joint_angle(j_idx, self.ctrl.j_vals[j_idx])
+
+    def _on_step_changed(self, value):
+        self.ctrl.j_step = float(value)
+
+    def _on_set_home(self):
+        self.ctrl.save_home_pos()
+
+    def _on_go_home(self):
+        self.ctrl.go_home_pos()
+        for idx in range(self.ctrl.j_num):
+            self.refresh_row(idx, self.ctrl.j_vals[idx])
+        
+    # --------------------------------------------
+    #           Robot state interface
+    # --------------------------------------------
     def read_joints_data(self, dbg_s=False):
         """Read joint data."""
         # dbg_s = True  # DBG
-        p_wid = self.findChild(QGroupBox, "tp_gb0_wd")
+        p_wid = self.form.findChild(QGroupBox, "tp_gb0_wd")
         if p_wid is None:
             return
         else:
             # fcl_msg(wid.children())  # DBG
             pass
 
-        for j_n, jnt in enumerate(self.rob_obj.Robot_joints):
+        for j_n, jnt in enumerate(self.ctrl.robot.Robot_joints):
             if dbg_s:
                 fcl_msg(f"{j_n} {jnt.Label}")
             set_wid_text(p_wid, f"lbl_jnt{j_n + 1:02d}", QLabel, f"<b>{jnt.Label}</b>")
@@ -342,167 +496,76 @@ class O2PDialog(QDialog):
             btn_p_nm = f"btn_jnt_p{j_n + 1:02d}"
             btn_p = getObjByName(p_wid, btn_p_nm)
             if btn_p is not None:
-                btn_p.clicked.connect(self.change_angle)
+                # lambda workaround taken from BIM workbench
+                btn_p.clicked.connect(lambda _checked=False, idx=j_n: self._on_step(idx, +1))
             else:
                 fcl_err(f"button + for {btn_p_nm} not found!")
             # Assign to decrease angle button the action
             btn_m_nm = f"btn_jnt_m{j_n + 1:02d}"
             btn_m = getObjByName(p_wid, btn_m_nm)
             if btn_m is not None:
-                btn_m.clicked.connect(self.change_angle)
+                # lambda workaround taken from BIM workbench
+                btn_m.clicked.connect(lambda _checked=False, idx=j_n: self._on_step(idx, -1))
             else:
                 fcl_err(f"button - for {btn_m_nm} not found!")
             # set the dir label
             set_wid_text(
-                p_wid, f"lbl_jdir{j_n + 1:02d}", QLabel, f"<b>{self.j_dirs[j_n]}</b>")
+                p_wid, f"lbl_jdir{j_n + 1:02d}", QLabel, f"<b>{self.ctrl.j_dirs[j_n]}</b>")
+            
+            # joint val and flip
+            nm = f"{j_n + 1:02d}"
+            sb = getObjByName(p_wid, f"dspb_jnt{nm}")
+            sb.valueChanged.connect(lambda v, idx=j_n: self._on_spin(idx, v))
 
-    def reload_fpo_data(self):
-        """Reload data from the robot  model FPO."""
-        self.reload_joints_dirs()
-        #
+            sl = getObjByName(p_wid, f"sl_jnt{nm}")
+            sl.valueChanged.connect(lambda raw, idx=j_n: self._on_slider(idx, raw))
 
-    def reload_joints_dirs(self):
-        """Reload joint dirs and update the control panel."""
-        p_wid = self.findChild(QGroupBox, "tp_gb0_wd")
-        if p_wid is None:
-            return
-        self.j_dirs = self.rob_obj.Robot_joints_dir
-        #
-        for j_n, jnt in enumerate(self.rob_obj.Robot_joints):
-            set_wid_text(
-                p_wid, f"lbl_jdir{j_n + 1:02d}", QLabel, f"<b>{self.j_dirs[j_n]}</b>")
-
-    def reset_joints(self):
-        """Reset joints value to 0"""
-        asm_obj = self.rob_obj.Robot_assembly
-        wid = self.findChild(QGroupBox, "tp_gb0_wd")
-        if asm_obj is None:
-            return
-
-        for j_n, jnt in enumerate(self.rob_obj.Robot_joints):
-            fl_nm = f"txt_jnta{j_n + 1:02d}"
-            jnt_o2 = jnt.Offset2
-            fcl_msg(f"{j_n} {jnt.Label}\n")
-            fcl_msg(f"OF2:  {jnt_o2}\n")
-            jnt.Offset2 = Placement(VEC0, Rotation())
-            asm_obj.recompute()
-            obj = getObjByName(wid, fl_nm)
-            fcl_msg(f"Field name: {fl_nm}, obj: {obj}\n")  # DBG
-            obj.setText(str(0.0))
-            self.j_vals[j_n] = 0.0
-        #
-        self.dump_intvar("reset_joint")  # DBG
+            ck = getObjByName(p_wid, f"chk_flip{nm}")
+            ck.setChecked(self.ctrl.j_dirs[j_n] == -1)
+            ck.toggled.connect(lambda c, idx=j_n: self._on_flip(idx, c))
 
     def set_defaults(self):
         """Set defaults value in the Control group."""
-        wid = self.findChild(QGroupBox, "tp_gb0_wd")
-        for idx in range(1, self.j_num + 1):
-            obj = getObjByName(wid, f"txt_jnta{idx:02d}")
-            if obj is not None:
-                obj.setText(str(self.j_vals[idx - 1]))
-            obj_s = getObjByName(wid, f"txt_jnts{idx:02d}")
-            if obj_s is not None:
-                obj_s.setText(str(self.j_step[idx - 1]))
-
-    def set_pose(self, dbg_s=False):
-        """Set pose to the standard one."""
-        # NOTE: this is mostly to reset the pose as actually assembly is not
-        #       setting it if you don't alter the Offset2 position see below.
-        # dbg_s = True  # DBG
-        asm_obj = self.rob_obj.Robot_assembly
-        for j_n, jnt in enumerate(self.rob_obj.Robot_joints):
-            jnt_o2 = jnt.Offset2
-            if dbg_s:
-                fcl_msg(f"{j_n} {jnt.Label}\n")
-                fcl_msg(f"OF2:  {jnt_o2}\n")
-            # NOTE: setting Offset2 adding increment and then without is a trick
-            #       maybe in future it will be not needed.
-            jnt.Offset2 = Placement(VEC0, Rotation(1, 0, 0)).multiply(jnt_o2)
-            asm_obj.recompute()
-            jnt.Offset2 = jnt_o2
-            asm_obj.recompute()
-
-    def set_working_rbt(self, dbg_s=False):
-        """Set working robot."""
-        # dbg_s = True
-        if self.rob_obj.Robot_assembly is None:
-            msg_box(
-                self, "Robot", self.fnt,
-                "<b>Robot</b><br><br>You must select a complete Robot Object")
-            return
-        else:
-            obj = self.rob_obj.Robot_assembly
-            setview(obj.Document.Name, 1)
-            jnt_nm = len(self.rob_obj.Robot_joints)
-            if jnt_nm < 1:
-                msg_box(
-                    self, "Robot", self.fnt,
-                    "<b>Robot</b><br><br>You must select a complete Robot Object")
-                return
-            if dbg_s:
-                fcl_msg(f"Joint numbers: {jnt_nm}\n")
-            self.j_num = jnt_nm
-            self.j_dirs = []
-            self.j_nms = []
-            self.j_step = []
-            self.j_vals = []
-            #
-            for n in range(jnt_nm):
-                jnt_n = n + 1
-                self.j_nms.append(f"Joint{jnt_n:02d}")
-                self.j_vals.append(0.0)
-                self.j_step.append(1.0)
-        #
-        if not self.rob_obj.Robot_joints_dir:
-            msg_box(
-                self, "Robot", self.fnt,
-                ("<b>WARNING</b><br><br>"
-                 f"{self.rob_obj.Name} lacks of a proper <b>Robot_joints_dir</b>"
-                 "<br><br>It will be populated with a 'list' "))
-            dummy_lst = []
-            for n in range(jnt_nm):
-                dummy_lst.append(1)
-            #
-            self.rob_obj.Robot_joints_dir = dummy_lst
-        #
-        self.j_dirs = self.rob_obj.Robot_joints_dir
-
-    def setJointAngle(self, j_idx, value, dbg_s=False):
-        """Set joint angle."""
-        joint = self.rob_obj.Robot_joints[j_idx]
-        if dbg_s:
-            fcl_msg(f"{j_idx} - {joint.Label}\n")
-            prev_ofs = joint.Offset2
-        #
-        joint.Offset2 = Placement(VEC0, Rotation(value, 0, 0))
-        joint.recompute()
-        if dbg_s:
-            fcl_msg(f"Offset2: {prev_ofs} >> {joint.Offset2}\n")
+        for idx in range(self.ctrl.j_num):
+            self.refresh_row(idx, self.ctrl.j_vals[idx])
 
     # --------------------------------------------
-    #                debug functions
+    #      Standard Taskpanel functions
     # --------------------------------------------
-
-    def dump_intvar(self, op_nm):
-        """Dump internal variables."""
-        msg = (
-            f"----- {op_nm} -----\n"
-            f"- j num = {self.j_num}\n"
-            f"- j_dirs: {self.j_dirs}\n"
-            f"- j_nms: {self.j_nms}\n"
-            f"- j_step: {self.j_step}\n"
-            f"- j_vals: {self.j_vals}\n"
-            "--------------------------------\n"
-        )
-        fcl_msg(msg)
+    def getStandardButtons(self):
+        """Draw a single X close btn"""
+        return QtGui.QDialogButtonBox.Close
+    
+    def reject(self):
+        """Runs when user closes taskpanel"""
+        Gui.Control.closeDialog()
+        return True
+    # --------------------------------------------
 
 
 def run():
-    dialog = O2PDialog()
-    dialog.show()
+    sel = Gui.Selection.getSelection()
+    fnt = QApplication.font("QMessageBox")
+    if len(sel) != 1 \
+            or sel[0].TypeId != "App::FeaturePython" \
+            or not sel[0].Name.startswith("Robot_FPO"):
+
+        msg_box(Gui.getMainWindow(), "Robot", fnt, 
+                "<b>Robot Selection</b><br><br>You must select a 'Robot_FPO' from the tree")
+        #fcl_err(f"sel:{str(len(sel))}, typeID:{sel[0].TypeId}, name:{sel[0].Name}")
+        return
+    
+    if not hasattr(sel[0], "Robot_home_pos"):
+        msg_box(Gui.getMainWindow(), "Robot", fnt, 
+            "<b>Robot Missing Properties</b><br><br>You must recreate 'Robot_FPO'")
+     
+    # sel[0] contains the robot fpo
+    panel = AnimationTaskPanel(sel[0])
+    Gui.Control.showDialog(panel)
+
+
 
 # Executed if not imported as module
 
-
-if __name__ == "__main__":
-    dialog = O2PDialog()
+# if __name__ == "__main__":
+#     dialog = O2PDialog()

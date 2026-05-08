@@ -194,22 +194,7 @@ class O2PDialog(QDialog):
     """Show a dialog for RobotAnimator."""
 
     ui_title = "Define Robot"
-    IsInit = False  # flag to avoid unwanted action execution during init.
-    # Flags dictionary, place here sane defaults
-    flags = {"chb_cpa": False, "chb_gdj": True}
-    #
-    tab_data = {
-        "ma": {"nm": "Main", "cn": 0}, "lg": {"nm": "Log", "cn": 0}}
-    #
-    wk_mod = None  # Working model
-    wk_asm = None  # Robot model as Assembly DO
-    wk_asm_d = None  # Robot Assembly Document
-    rob_obj = None  # Robot FPO
-    # Default values for testing
-    s_doc = None  # Assembly service doc
-    eus = None   #
-    fnt = None  # Font for widgets
-    lb_em = 0  #
+    
     # Rotation axis vis data
     as_rashl = 100  # cyl len used on Assembly Service doc
     as_rarad = 3  # cyl rad used on Assembly Service doc
@@ -218,12 +203,7 @@ class O2PDialog(QDialog):
     rad_rarad = 1.5  # cyl rad used on Robot Assembly doc
     rad_raclr = ap_clr["Orange"][0]  # color used for CRC Robot ASM doc
     rad_raoclr = ap_clr["B_Purple"][0]  # color used for JCS on ASM doc
-    #
-    rbm_dt = {'rb_jnts': 0, }  # Robot model data  dictionary
-    # --- Joint sequence control ---
-    jnt_ec = 0  # joint edit counter, indicate what joint we are editing.
-    jnt_fc = 1  # joint face counter it will be reset by add_jnt_asm code
-    jnt_meta = {}  # joint metadata it will be reset by add_jnt_asm code
+ 
     #
     # Stylesheets
     grb_ss = (
@@ -287,6 +267,26 @@ class O2PDialog(QDialog):
     def __init__(self, parent=Gui.getMainWindow()):
         """Canonical Init."""
         super().__init__(parent)
+        
+        # --- Joint sequence control ---
+        self.jnt_ec = 0  # joint edit counter, indicate what joint we are editing.
+        self.jnt_fc = 1  # joint face counter it will be reset by add_jnt_asm code
+        self.jnt_meta = {}  # joint metadata it will be reset by add_jnt_asm code
+        # Flags dictionary, place here sane defaults
+        self.flags = {"chb_cpa": False, "chb_gdj": True}
+        #
+        self.wk_mod = None  # Working model
+        self.wk_asm = None  # Robot model as Assembly DO
+        self.wk_asm_d = None  # Robot Assembly Document
+        self.rob_obj = None  # Robot FPO
+        # Default values for testing
+        self.s_doc = None  # Assembly service doc
+        self.fnt = None  # Font for widgets
+        self.lb_em = 0  #
+        #
+        self.tab_data = {"ma": {"nm": "Main", "cn": 0}, "lg": {"nm": "Log", "cn": 0}}
+
+        # UI
         self.initUI()
 
     def initUI(self):
@@ -889,7 +889,9 @@ class O2PDialog(QDialog):
             # rb_ro_jnt the added _ro_ will mean rotation but could also be
             # sl = sliding, or pr = prismatic. Let me know
 
+            # FIXME: Fix jont name clash in case of deletion and new insertions
             j_lbl = f"rb_jnt{self.jnt_ec:02d}"  # see note above
+            # matching asm wb conventon below. [face, [optional:vertex]]
             j_ref1 = [jnt_fc1_oref, jnt_fc1_oref]
             j_ref2 = [jnt_fc2_oref, jnt_fc2_oref]
             
