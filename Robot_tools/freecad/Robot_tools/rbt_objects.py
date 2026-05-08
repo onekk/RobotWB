@@ -52,6 +52,9 @@ class Robot_obj:
         obj.addProperty(
             "App::PropertyFile", "STEPFile", "General",
             "File from where elements have been loaded.")
+        obj.addProperty(
+            "App::PropertyFloatList", "Robot_home_pos", "Robot",
+            "Robot home position angles")
 
         obj.Proxy = self
 

@@ -13,10 +13,11 @@ __build__ = "20260507_1256"
 
 from PySide import QtGui, QtCore  # noqa  # QtWidgets
 from PySide.QtWidgets import (  # noqa
-    QApplication, QCheckBox,  QFrame, QGroupBox, QLabel, QLineEdit, QPlainTextEdit,
+    QApplication, QCheckBox,  QFrame, QGroupBox, QLabel, 
+    QLineEdit, QPlainTextEdit, QDoubleSpinBox, QSlider,
     QPushButton, QSpinBox, QTabWidget, QTextEdit, QWidget,  # Widgets
     QDialog, QFileDialog, QInputDialog, QMessageBox,  # Dialogs
-    QGridLayout, QVBoxLayout, QSizePolicy)  # Layouts and Policy
+    QGridLayout, QVBoxLayout, QScrollArea, QSizePolicy)  # Layouts and Policy
 from PySide.QtCore import QObject, Qt  # noqa
 
 from .rbt_constants import ap_clr
@@ -198,6 +199,54 @@ def cm_txt(parent, t_nm, t_fnt, t_hei, rich=True):
 
     return text_f
 
+def cm_dspb(parent, sb_nm, sb_fnt, sb_min=-180, sb_max=180,
+            sb_dec=2, sb_step=0.1, sb_suf="°"):
+    """Creates a styled QDoubleSpinBox"""
+    sb = QDoubleSpinBox()
+    sb.setObjectName(sb_nm)
+    sb.setObjectName(sb_nm)
+    sb.setFont(sb_fnt)
+    sb.setDecimals(sb_dec)
+    sb.setRange(sb_min, sb_max)
+    sb.setSingleStep(sb_step)
+    sb.setSuffix(sb_suf)
+    sb.setButtonSymbols(QDoubleSpinBox.NoButtons)
+    if parent is not None:
+        sb.setParent(parent)
+    return sb
+
+def cm_slider(parent, sl_nm, sl_min=-180, sl_max=180, sl_scale=100):
+    """
+    Creates a horizontal QSlider that links to a scale.
+    - Write: sl.setValue(int(angle*sl._scale))
+    - Read : sl.value() / sl._scale
+    """
+    sl = QSlider(Qt.Horizontal)
+    sl.setObjectName(sl_nm)
+    sl.setRange(int(sl_min * sl_scale), int(sl_max * sl_scale))
+    sl._scale = sl_scale
+    if parent is not None:
+        sl.setParent(parent)
+    return sl
+
+def cm_toggle(parent, ct_nm, ct_fnt):
+    """Creates circlular flip toggle"""
+    ck = QCheckBox(parent)
+    ck.setObjectName(ct_nm)
+    ck.setFont(ct_fnt)
+    return ck
+
+def cm_scroll(parent, sa_nm, inner_wd):
+    """Wrap in borderless QScrollArea"""
+    sa = QScrollArea()
+    sa.setObjectName(sa_nm)
+    sa.setWidget(inner_wd)
+    sa.setWidgetResizable(True)
+    sa.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+    sa.setFrameShape(QFrame.NoFrame)
+    if parent is not None:
+        sa.setParent(parent)
+    return sa
 
 def get_dir(parent, fnt, pre_dir=""):
     """Get a directory from a file dialog."""

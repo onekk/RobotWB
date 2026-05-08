@@ -118,6 +118,6 @@ def switch_document(doc_name):
     App.ActiveDocument = App.getDocument(doc_name)
     Gui.ActiveDocument = Gui.getDocument(doc_name)
     #  Trick to swith the Gui to show the document
-    gv = Gui.ActiveDocument.ActiveView.graphicsView()
-    pw = gv.parentWidget().parentWidget().parentWidget()
-    Gui.getMainWindow().centralWidget().setActiveSubWindow(pw)
+    # gv = Gui.ActiveDocument.ActiveView.graphicsView()
+    # pw = gv.parentWidget().parentWidget().parentWidget()
+    # Gui.getMainWindow().centralWidget().setActiveSubWindow(pw)
