@@ -11,6 +11,9 @@ Licence: LGPL 2.1
 __version__ = "0.01"
 __build__ = "20260507_1256"
 
+import os
+import FreeCADGui as Gui
+
 from PySide import QtGui, QtCore  # noqa  # QtWidgets
 from PySide.QtWidgets import (  # noqa
     QApplication, QCheckBox,  QFrame, QGroupBox, QLabel, 
@@ -21,6 +24,8 @@ from PySide.QtWidgets import (  # noqa
 from PySide.QtCore import QObject, Qt  # noqa
 
 from .rbt_constants import ap_clr
+from freecad.Robot_tools import tb_locator
+
 
 # ------------------------------------------------
 #                   Color setters
@@ -199,6 +204,7 @@ def cm_txt(parent, t_nm, t_fnt, t_hei, rich=True):
 
     return text_f
 
+
 def cm_dspb(parent, sb_nm, sb_fnt, sb_min=-180, sb_max=180,
             sb_dec=2, sb_step=0.1, sb_suf="°"):
     """Creates a styled QDoubleSpinBox"""
@@ -215,6 +221,7 @@ def cm_dspb(parent, sb_nm, sb_fnt, sb_min=-180, sb_max=180,
         sb.setParent(parent)
     return sb
 
+
 def cm_slider(parent, sl_nm, sl_min=-180, sl_max=180, sl_scale=100):
     """
     Creates a horizontal QSlider that links to a scale.
@@ -229,12 +236,14 @@ def cm_slider(parent, sl_nm, sl_min=-180, sl_max=180, sl_scale=100):
         sl.setParent(parent)
     return sl
 
+
 def cm_toggle(parent, ct_nm, ct_fnt):
     """Creates circlular flip toggle"""
     ck = QCheckBox(parent)
     ck.setObjectName(ct_nm)
     ck.setFont(ct_fnt)
     return ck
+
 
 def cm_scroll(parent, sa_nm, inner_wd):
     """Wrap in borderless QScrollArea"""
@@ -247,6 +256,7 @@ def cm_scroll(parent, sa_nm, inner_wd):
     if parent is not None:
         sa.setParent(parent)
     return sa
+
 
 def get_dir(parent, fnt, pre_dir=""):
     """Get a directory from a file dialog."""
@@ -367,3 +377,12 @@ def set_wid_en(parent, obj_nm, state=True):
             pass
         else:
             wid.setEnabled(state)
+
+
+def load_panel_ui(filename):
+    """
+    Helper to load .ui files located at Gui/resources/ui/<filename>.
+    """
+    wb_path = os.path.dirname(tb_locator.__file__)
+    ui_path = os.path.join(wb_path, "resources", "ui", filename)
+    return Gui.PySideUic.loadUi(ui_path)

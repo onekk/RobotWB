@@ -6,6 +6,7 @@ Licence: LGPL 2.1
 """
 
 import os
+import FreeCAD as App
 import FreeCADGui as Gui
 from importlib import import_module, reload
 
@@ -28,7 +29,8 @@ class rbt_cmd2:
     def GetResources(self):
         """Resources."""
         return {
-            'Pixmap': os.path.join(wb_path, 'resources/icons/rbt_studyRobot.svg'),
+            'Pixmap': os.path.join(wb_path,
+                                   'resources/icons/rbt_studyRobot.svg'),
             # 'Accel': "F11",
             'MenuText': "Study Robot Object",
             'ToolTip': "<b>Study Robot Object</b>"
@@ -49,7 +51,8 @@ class rbt_cmd3:
     def GetResources(self):
         """Resources."""
         return {
-            'Pixmap': os.path.join(wb_path, 'resources/icons/rbt_animateRobot.svg'),
+            'Pixmap': os.path.join(wb_path,
+                                   'resources/icons/rbt_animateRobot.svg'),
             # 'Accel': "F11",
             'MenuText': "Animate Robot",
             'ToolTip': "<b>Animate Robot</b>"
@@ -65,12 +68,14 @@ class rbt_cmd3:
         """IsActive."""
         return True
 
+
 class rbt_cmd4:
     """Robot tools command 3."""
     def GetResources(self):
         """Resources."""
         return {
-            'Pixmap': os.path.join(wb_path, 'resources/icons/rbt_defineRobot.svg'),
+            'Pixmap': os.path.join(wb_path,
+                                   'resources/icons/rbt_defineRobot.svg'),
             # 'Accel': "F11",
             'MenuText': "Define Robot",
             'ToolTip': "<b>Define a Robt from CAD elements</b>"
@@ -87,6 +92,22 @@ class rbt_cmd4:
         return True
 
 
+class rbt_cmd5:
+    def GetResources(self):
+        return {"Pixmap":   os.path.join(wb_path,
+                                         'resources/icons/rbt_defineTool.svg'),
+                "MenuText": "Define Tool",
+                "ToolTip":  "Define a Tool and TCP on the active robot"}
+
+    def IsActive(self):
+        return App.ActiveDocument is not None
+
+    def Activated(self):
+        from freecad.Robot_tools.Gui import define_tool
+        define_tool.run()
+
+
 Gui.addCommand('RBT_strob', rbt_cmd2())
 Gui.addCommand('RBT_anrob', rbt_cmd3())
 Gui.addCommand('RBT_defrob', rbt_cmd4())
+Gui.addCommand('RBT_deftool', rbt_cmd5())

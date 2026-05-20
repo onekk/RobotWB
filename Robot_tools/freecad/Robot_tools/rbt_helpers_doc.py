@@ -11,8 +11,11 @@ Licence: LGPL 2.1
 __version__ = "0.01"
 __build__ = "20260507_1255"
 
+import importlib.util
+
 import FreeCAD as App
 import FreeCADGui as Gui
+
 
 fcl_err = App.Console.PrintError
 fcl_msg = App.Console.PrintMessage
@@ -21,6 +24,8 @@ fcl_warn = App.Console.PrintWarning
 V3 = App.Vector
 Rotation = App.Rotation
 Placement = App.Placement
+
+motion_lib = {"status": None}
 
 
 def clear_doc(doc_name):
@@ -121,3 +126,14 @@ def switch_document(doc_name):
     # gv = Gui.ActiveDocument.ActiveView.graphicsView()
     # pw = gv.parentWidget().parentWidget().parentWidget()
     # Gui.getMainWindow().centralWidget().setActiveSubWindow(pw)
+
+
+def check_motion_lib(log=False):
+    """check if the kinematics library is installed"""
+    if motion_lib["status"] is None:
+        motion_lib["status"] = (
+            importlib.util.find_spec("tesseract_robotics_python") is not None)
+    if log and not motion_lib["status"]:
+        fcl_err("tesseract-robotics not found")
+
+    return motion_lib["status"]

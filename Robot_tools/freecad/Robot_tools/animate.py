@@ -225,6 +225,11 @@ class AnimationController:
         joint.Offset2 = Placement(VEC0, Rotation(angle, 0, 0))
         joint.recompute()
 
+        #  link the tool
+        tool = getattr(self.robot, "Active_tool", None)
+        if tool:
+            tool.recompute()
+
     def set_joint_angle_clamped(self, j_idx, value):
         """Checks joint limits before setting joint angles"""
         low, high = self.get_joint_limits(j_idx)

@@ -48,6 +48,8 @@ class Robot_obj:
             "Robot joints direction")
         obj.addProperty(
             "App::PropertyLinkListGlobal", "Tools_joints", "Tools", "Tools joints list")
+        obj.addProperty(
+           "App::PropertyLink", "Active_tool", "Tools", "Currently active tool")
         # TODO: this is useful in case of unfinished editing
         obj.addProperty(
             "App::PropertyFile", "STEPFile", "General",
@@ -102,6 +104,13 @@ class Robot_obj:
         '''Do something when doing a recomputation, this method is mandatory'''
         fcl_msg("Execute reached\n")  # DBG
         #
+        if (App.GuiUp
+                and fp.Robot_joints
+                and fp.Active_tool is None):
+
+            from freecad.Robot_tools.gui.define_tool import create_default_tool
+            create_default_tool(fp, name="Default_Tool")
+
         fp.recompute()
 
 

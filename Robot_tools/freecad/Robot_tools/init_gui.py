@@ -15,12 +15,12 @@ from freecad.Robot_tools.rbt_objects import Robot_obj, ViewProviderRBo
 fc_log_msg = App.Console.PrintMessage
 
 tb_pstr = "User parameter:BaseApp/Workbench/Global/Toolbar"
-tb_vers = 1.05
+tb_vers = 1.06
 tb_name = "Robot Tools Toolbar"
 pg_name = "Robot_tools"
 
 tb_cmds = [("RBT_defrob", "RBT"), ("RBT_strob", "RBT"),
-           ("RBT_anrob", "RBT")]
+           ("RBT_anrob", "RBT"),("RBT_deftool", "RBT")]
 
 gtb_grp = App.ParamGet(tb_pstr)
 
