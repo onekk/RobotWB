@@ -51,19 +51,26 @@ class Tool:
                       UtilsAssembly.findPlacement(rob_flange_ref))
 
         tool_flange_ref = fp.Tool_flange_link
-        has_tool = (tool_flange_ref 
-                    and tool_flange_ref[0]
-                    and fp.Tool_shape)
 
-        if has_tool:
-            # when we have tool geom, attach it to rob
-            tool_flange_local = UtilsAssembly.findPlacement(tool_flange_ref)
+        if fp.Tool_shape:
+            # add tool flange to robot flange
+            # if user didnt pick tool flange yet
+            # then assume tool's local origin as flange
+            if tool_flange_ref and tool_flange_ref[0]:
+                tool_flange_local = UtilsAssembly.findPlacement(
+                                    tool_flange_ref)
+            else:
+                tool_flange_local = App.Placement()
 
             # add tool flange face antiparallel to rob flange
             tool_shape_placement = (flip_z_dir(rob_flange)
                                     .multiply(fp.Tool_offset)
                                     .multiply(tool_flange_local.inverse()))
-            fp.Tool_shape.Placement = tool_shape_placement
+            if not fp.Tool_shape.Placement.isSame(tool_shape_placement):
+                fp.Tool_shape.Placement = tool_shape_placement
+                fp.Tool_shape.purgeTouched()
+
+            # fp.Tool_shape.Placement = tool_shape_placement
             # seated_flange = tool_shape_placement.multiply(tool_flange_local)
 
             tcp_ref = fp.TCP_link
@@ -71,7 +78,7 @@ class Tool:
                 tcp_ref) if (tcp_ref and tcp_ref[0]) else App.Placement()
 
             # TCP placement relative to tool body
-            fp.TCP_placement = (fp.Tool_shape.Placement
+            fp.TCP_placement = (tool_shape_placement
                                 .multiply(tcp_local)
                                 .multiply(fp.TCP_offset))
         else:

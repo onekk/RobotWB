@@ -100,7 +100,9 @@ class rbt_cmd5:
                 "ToolTip":  "Define a Tool and TCP on the active robot"}
 
     def IsActive(self):
-        return App.ActiveDocument is not None
+        doc = App.ActiveDocument
+        return bool(doc) and any(hasattr(o, "Robot_joints")
+                                 for o in doc.Objects)
 
     def Activated(self):
         from freecad.Robot_tools.Gui import define_tool

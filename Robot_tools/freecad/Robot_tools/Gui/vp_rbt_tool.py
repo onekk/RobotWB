@@ -37,6 +37,15 @@ class ViewProviderTool:
         vobj.addDisplayMode(root, "Standard")
         self.refresh_tx(vobj.Object)
 
+    def claimChildren(self):
+        """
+        joins the tool CAD as a sub-child in the tree
+        """
+        obj = self.Object
+        return ([obj.Tool_shape]
+                if getattr(obj, "Tool_shape", None)
+                else [])
+
     def doubleClicked(self, vobj):
         from freecad.Robot_tools.Gui.define_tool import tool_parent, DefineTCP
         # Find the robot that owns this tool.

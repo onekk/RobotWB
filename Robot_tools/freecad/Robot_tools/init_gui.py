@@ -15,7 +15,7 @@ from freecad.Robot_tools.rbt_objects import Robot_obj, ViewProviderRBo
 fc_log_msg = App.Console.PrintMessage
 
 tb_pstr = "User parameter:BaseApp/Workbench/Global/Toolbar"
-tb_vers = 1.06
+tb_vers = 1.07
 tb_name = "Robot Tools Toolbar"
 pg_name = "Robot_tools"
 

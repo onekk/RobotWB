@@ -14,7 +14,7 @@ fcl_err = App.Console.PrintError
 
 
 # helpers
-def create_default_tool(robot, name="Default_TOOL"):
+def create_default_tool(robot, name="Default_Tool"):
     """
     Creates a tool with no geom and identity offsets
     """
@@ -30,14 +30,31 @@ def create_default_tool(robot, name="Default_TOOL"):
     tool_fpo.Tool_offset = App.Placement()
     tool_fpo.TCP_offset = App.Placement()
     tool_fpo.Tool_mass = 0.0
-    robot.Tools_joints = list(robot.Tools_joints) + [tool_fpo]
+    robot.Tools = list(robot.Tools) + [tool_fpo]
     robot.Active_tool = tool_fpo
     return tool_fpo
 
+def import_shape(rob, path):
+    """
+    import tool geom from .fcstd file
+    - [input] rob : robot fpo (used for Document)
+    - [input] path : .fcstd file path
+    """
+    from freecad.Robot_tools.App.rbt_tool import has_valid_shape
+    doc = rob.Document
+    before = {o.Name for o in doc.Objects}
+    doc.mergeProject(path)
+    new_objs = [o for o in doc.Objects if o.Name not in before]
+    shapes = [o for o in new_objs if has_valid_shape(o)]
+    if not shapes:
+        fcl_err("no suitable shape in selected file\n")
+        return None
+    return shapes[0]
 
 def import_tool(rob, path):
     """
-    import tool geom from .fcstd file & create tool fpo
+    TODO:: Import tools directly in future
+    import tool from .fcstd file & create tool fpo
     if tool fpo exists copy directly, if not create a default fpo
     - [input] rob : robot fpo to attach the tool to
     - [input] path : file path containing geom
@@ -64,10 +81,9 @@ def import_tool(rob, path):
             return
 
         # take first usable shape
-        shape = shapes[0]
         file_base = os.path.splitext(os.path.basename(path))[0]
         t = create_default_tool(rob, name=file_base)
-        t.Tool_shape = shape
+        t.Tool_shape = shapes[0]
 
     # robot side connections
     t.Source_file = path
@@ -75,10 +91,10 @@ def import_tool(rob, path):
         last_joint = rob.Robot_joints[-1]
         t.Flange_link = last_joint.Reference2
 
-    tools = list(rob.Tools_joints)
+    tools = list(rob.Tools)
     if t not in tools:
         tools.append(t)
-        rob.Tools_joints = tools
+        rob.Tools = tools
     rob.Active_tool = t
 
     # restore active doc
@@ -91,7 +107,7 @@ def tool_parent(tool_fpo):
     if tool_fpo is None:
         return None
     return next((r for r in tool_fpo.Document.Objects
-                 if hasattr(r, "Tools_joints") and tool_fpo in r.Tools_joints),
+                 if hasattr(r, "Tools") and tool_fpo in r.Tools),
                 None)
 
 
@@ -287,17 +303,48 @@ class DefineTCP:
         self.recompute()
         # self.tool_flange_lbl.setText(f"{s.Object.Label}.{sub}")
 
-    # def _on_pick_shape_(self):
+    # def _on_pick_shape(self):
+    #     """
+    #     pick tool's cad shape. binds pre-selected shape to curr tool fpo
+    #     if no shape selected - import tool from fcstd file
+    #     """
+    #     from freecad.Robot_tools.App.rbt_tool import has_valid_shape
+
     #     sel = Gui.Selection.getSelection()
-    #     obj = next((o for o in sel if hasattr(o, "Shape")), None)
-    #     if obj is None:
-    #         fcl_err("Pick an object with shape (CAD)")
+    #     shape = next((o for o in sel if has_valid_shape(o)), None)
+
+    #     if shape is not None:
+    #         # pre-selection: bind shape to default tool
+    #         self.tool.Tool_shape = shape
+    #         self.refresh_shape_lbl()
+    #         self.recompute()
     #         return
 
-    #     self.tool.Tool_shape = obj
+    #     # noting selected: open file picker
+    #     path, _ = QtGui.QFileDialog.getOpenFileName(
+    #         Gui.getMainWindow(),
+    #         "Select Tool File",
+    #         "",
+    #         "FreeCAD Files (*.FCStd *.fcstd);;All files (*)"
+    #     )
+    #     if not path:
+    #         return
+
+    #     prev_flange = self.tool.Flange_link if (self.tool.Flange_link
+    #                                             and self.tool.Flange_link[0]) else None
+
+    #     new_tool = import_tool(self.robot, path)
+    #     if new_tool is None:
+    #         return
+    #     if prev_flange is not None:
+    #         new_tool.Flange_link = prev_flange
+
+    #     self.swap_tool(new_tool)
     #     self.refresh_shape_lbl()
+    #     self.refresh_tflange_lbl()
+    #     self.refresh_tcp_lbl()
+    #     self.load()
     #     self.recompute()
-    #     # self.tool_shape_lbl.setText(obj.Label)
 
     def _on_pick_shape(self):
         """
@@ -309,31 +356,22 @@ class DefineTCP:
         sel = Gui.Selection.getSelection()
         shape = next((o for o in sel if has_valid_shape(o)), None)
 
-        if shape is not None:
-            # pre-selection: bind shape to default tool
-            self.tool.Tool_shape = shape
-            self.refresh_shape_lbl()
-            self.recompute()
-            return
+        if shape is None:
+            # noting selected: open file picker
+            path, _ = QtGui.QFileDialog.getOpenFileName(
+                Gui.getMainWindow(),
+                "Select Tool File",
+                "",
+                "FreeCAD Files (*.FCStd *.fcstd);;All files (*)"
+            )
+            if not path:
+                return
+            shape = import_shape(self.robot, path)
+            if shape is None:
+                return
 
-        # noting selected: open file picker
-        path, _ = QtGui.QFileDialog.getOpenFileName(
-            Gui.getMainWindow(),
-            "Select Tool File",
-            "",
-            "FreeCAD Files (*.FCStd *.fcstd);;All files (*)"
-        )
-        if not path:
-            return
-
-        new_tool = import_tool(self.robot, path)
-        if new_tool is None:
-            return
-        self.swap_tool(new_tool)
+        self.tool.Tool_shape = shape
         self.refresh_shape_lbl()
-        self.refresh_tflange_lbl()
-        self.refresh_tcp_lbl()
-        self.load()
         self.recompute()
 
     def _on_pick_tflange(self):
@@ -343,8 +381,8 @@ class DefineTCP:
             return
         s = selx[0]
         sub = s.SubElementNames[0]
-        picked = s.PickedPoints[0] if s.PickedPoints else App.Vector()
         ref = [s.Object, [sub]]
+        picked = s.PickedPoints[0] if s.PickedPoints else App.Vector()
         vtx = UtilsAssembly.findElementClosestVertex(ref, picked)
         self.tool.Tool_flange_link = UtilsAssembly.addVertexToReference(
             ref, vtx)
@@ -371,8 +409,8 @@ class DefineTCP:
         """
         old = self.tool
         self.tool = new_tool
-        self.robot.Tools_joints = [t for t in
-                                   self.robot.Tools_joints if t is not old]
+        self.robot.Tools = [t for t in
+                                   self.robot.Tools if t is not old]
         # TODO: check if we have to remove old tools
         self.doc.removeObject(old.Name)
 

@@ -40,14 +40,15 @@ class Robot_obj:
         obj.addProperty(
             "App::PropertyLink", "Robot_assembly", "Robot", "Robot_assembly")
         obj.addProperty(
-            "App::PropertyLinkListGlobal", "Robot_joints", "Robot", "Robot joints list")
+            "App::PropertyLinkList", "Robot_joints", "Robot", "Robot joints list")
         obj.addProperty(
             "App::PropertyPlacementList", "Robot_links", "Robot", "Robot link lists")
         obj.addProperty(
             "App::PropertyIntegerList", "Robot_joints_dir", "Robot",
             "Robot joints direction")
         obj.addProperty(
-            "App::PropertyLinkListGlobal", "Tools_joints", "Tools", "Tools joints list")
+            "App::PropertyLinkList", "Tools", "Tools",
+            "Tool FPOs attached to the robot")
         obj.addProperty(
            "App::PropertyLink", "Active_tool", "Tools", "Currently active tool")
         # TODO: this is useful in case of unfinished editing
@@ -58,7 +59,7 @@ class Robot_obj:
         obj.addProperty(
             "App::PropertyString", "Version", "Base",
             "Object version")
-        obj.Version = "0.01"
+        obj.Version = __version__  # "0.01"
 
         obj.addProperty(
             "App::PropertyFloatList", "Robot_home_pos", "Robot",
@@ -95,10 +96,22 @@ class Robot_obj:
                 "Object version")
             obj.Version = "0.01"
 
-            if not hasattr(obj, "Robot_home_pos"):
-                obj.addProperty(
-                    "App::PropertyFloatList", "Robot_home_pos", "Robot",
-                    "Robot home position angles")
+        # -------------------------------------------------
+        #   add missing props for back compatability
+        # -------------------------------------------------
+
+        if not hasattr(obj, "Robot_home_pos"):
+            obj.addProperty(
+                "App::PropertyFloatList", "Robot_home_pos", "Robot",
+                "Robot home position angles")
+        if not hasattr(obj, "Tools"):
+            obj.addProperty(
+                "App::PropertyLinkList", "Tools", "Tools",
+                "Tool FPOs attached to the robot")
+        if not hasattr(obj, "Active_tool"):
+            obj.addProperty(
+                "App::PropertyLink", "Active_tool", "Tools",
+                "Currently active tool")
 
     def execute(self, fp):
         '''Do something when doing a recomputation, this method is mandatory'''
@@ -108,10 +121,10 @@ class Robot_obj:
                 and fp.Robot_joints
                 and fp.Active_tool is None):
 
-            from freecad.Robot_tools.gui.define_tool import create_default_tool
+            from freecad.Robot_tools.Gui.define_tool import create_default_tool
             create_default_tool(fp, name="Default_Tool")
 
-        fp.recompute()
+        # fp.recompute()
 
 
 class ViewProviderRBo:
@@ -152,6 +165,19 @@ class ViewProviderRBo:
           It must be defined in getDisplayModes.
         """
         return "Standard"
+
+    def claimChildren(self):
+        """
+        populates the sub-elements (links, tools etc)
+        under the robot fpo
+        """
+        obj = self.Object
+        kids = []
+        if getattr(obj, "Robot_assembly", None):
+            kids.append(obj.Robot_assembly)
+        # kids.extend(getattr(obj, "Robot_joints", []) or [])
+        kids.extend(getattr(obj, "Tools", []) or [])
+        return kids
 
     def onChanged(self, vp, prop):
         """
