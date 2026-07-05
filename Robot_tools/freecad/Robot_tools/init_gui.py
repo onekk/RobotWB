@@ -10,7 +10,7 @@ import FreeCADGui as Gui
 import FreeCAD as App
 from . import tb_commands
 
-from freecad.Robot_tools.rbt_objects import Robot_obj, ViewProviderRBo
+from freecad.Robot_tools.App.rbt_objects import Robot_obj, ViewProviderRBo
 
 fc_log_msg = App.Console.PrintMessage
 

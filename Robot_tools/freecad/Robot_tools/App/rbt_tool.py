@@ -3,6 +3,9 @@ __version__ = "0.01"
 
 import FreeCAD as App  # type: ignore
 import UtilsAssembly   # type: ignore
+
+from freecad.Robot_tools.App.rbt_frames import JogFrame, apply_jog_frames
+
 fcl_msg = App.Console.PrintMessage
 
 TOOL_SCHEMA = [
@@ -28,6 +31,12 @@ TOOL_SCHEMA = [
     ("TCP_link",   "App::PropertyLinkSubGlobal", "Tool",
         "Reference on tool geom that defines TCP location"),
 
+    ("TCP_drag_frame", "App::PropertyEnumeration", "Tool",
+        "Current Axis-drag frame for inverse kinematic simulation"),
+
+    ("Jog_frames", "App::PropertyStringList", "Tool",
+     "Frames available for TCP dragging"),
+
     ("Source_file", "App::PropertyFile", "Tool", "Tool CAD's .fcstd path")
 ]
 
@@ -37,12 +46,20 @@ class Tool:
         self.add_properties(obj)
         obj.Proxy = self
 
+        obj.Jog_frames = JogFrame.names()
+
     def onDocumentRestored(self, fp):
         self.migrate_flange_link(fp)
         self.add_properties(fp)
+        self.migrate_drag_frame(fp)
 
     def onChanged(self, fp, prop):
-        fcl_msg(f"Tool change: {prop}\n")
+        if "Restore" in fp.State:
+            return
+        
+        if prop == "Jog_frames":
+            apply_jog_frames(fp)
+            return
 
         # invalidate cached backend on tool change
         if prop in ("Tool_offset", "TCP_offset", "TCP_link",
@@ -100,14 +117,17 @@ class Tool:
                 tcp_ref) if (tcp_ref and tcp_ref[0]) else App.Placement()
 
             # TCP placement relative to tool body
-            fp.TCP_placement = (tool_shape_placement
-                                .multiply(tcp_local)
-                                .multiply(fp.TCP_offset))
+            tcp = (tool_shape_placement
+                   .multiply(tcp_local)
+                   .multiply(fp.TCP_offset))
         else:
             # TCP placement relative to robot's flange
-            fp.TCP_placement = (rob_flange
-                                .multiply(fp.Tool_offset)
-                                .multiply(fp.TCP_offset))
+            tcp = (rob_flange
+                   .multiply(fp.Tool_offset)
+                   .multiply(fp.TCP_offset))
+
+        if not fp.TCP_placement.isSame(tcp):
+            fp.TCP_placement = tcp
 
     def add_properties(self, fp):
         """
@@ -117,6 +137,9 @@ class Tool:
         for name, typ, group, doc in TOOL_SCHEMA:
             if name not in existing:
                 fp.addProperty(typ, name, group, doc)
+
+        # set Jog_frames to be read only in the UI for now
+        fp.setEditorMode("Jog_frames", 1)
 
     def migrate_flange_link(self, fp):
         """
@@ -135,6 +158,14 @@ class Tool:
             #  user must re-pick
             fp.Flange_link = (old, [""])
 
+    def migrate_drag_frame(self, fp):
+        """
+        Upgrade docs saved with the old ["Local", "World"] enum
+        """
+        names = JogFrame.names()
+        if fp.getEnumerationsOfProperty("TCP_drag_frame") == names:
+            return
+        fp.Jog_frames = names  # -> onChanged -> apply_jog_frames
 
 # --------------------------
 #         helpers

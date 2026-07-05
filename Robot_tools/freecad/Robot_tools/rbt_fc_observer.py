@@ -12,8 +12,8 @@ Licence: LGPL 2.1
 __version__ = "0.01"
 __build__ = "20260507_1255"
 
-import FreeCAD as App
-from PySide.QtCore import QTimer
+import FreeCAD as App  # type: ignore
+from PySide.QtCore import QTimer  # type: ignore
 
 
 """
@@ -39,10 +39,32 @@ class RbtObserver:
         Refresh the panel after joint deletion
         """
         d = self.dialog
-        if d is None or getattr(d, "wk_asm_d", None) is None:
+        if d is None or getattr(d, "assembly_doc", None) is None:
             return
-        if obj.Document is not d.wk_asm_d:
+        if obj.Document is not d.assembly_doc:
             return
-        if hasattr(obj, "ObjectToGround") or hasattr(obj, "JointType"):
-            # deferred call,  d.refresh_joints_panel()
-            QTimer.singleShot(0, d.refresh_joints_panel)
+        is_joint = hasattr(obj, "ObjectToGround") or hasattr(obj, "JointType")
+        link_nm = obj.Name if obj.isDerivedFrom("App::Link") else None
+        QTimer.singleShot(0, lambda: d.on_obj_deleted(is_joint, link_nm))
+
+
+class RbtSelectionObserver:
+    """
+    refreshes the 3D selection for faces for joint creation
+    in the robot creator panel
+    """
+
+    def __init__(self, dialog):
+        self.dialog = dialog
+
+    def on_changed(self, *_):
+        QTimer.singleShot(0, self.dialog.refresh_pending_faces)
+
+    def addSelection(self, *a):
+        self.on_changed(*a)
+
+    def clearSelection(self, *a):
+        self.on_changed(*a)
+
+    def removeSelection(self, *a):
+        self.on_changed(*a)

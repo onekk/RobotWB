@@ -3,7 +3,6 @@ rbt_kine_chain.py
 extract chain spec from robot fpo
 reads:
     robot_obj.Robot_joints
-    robot_obj.Robot_joints_dir
     robot_obj.Active_tool
 """
 
@@ -11,8 +10,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional, TypeAlias
 
-import FreeCAD as App
-import UtilsAssembly
+import FreeCAD as App  # type: ignore
+import UtilsAssembly  # type: ignore
 
 from freecad.Robot_tools.App.rbt_kine_types import (
     ChainSpec, JointSpec, LinkSpec
@@ -42,11 +41,9 @@ def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:
     links: List[LinkSpec] = [LinkSpec(name=ground_obj.Name,
                                       parent_name=None)]
     joints: List[JointSpec] = []
+    dirs: List[int] = joint_dirs(robot_obj)
 
     prev_joint_world: Placement = base_world
-    # dirs: List[int] = [int(x) for x in (robot_obj.Robot_joints_dir or [])]
-    # while len(dirs) < len(joints_fpo):
-    #     dirs.append(1)
 
     for idx, j in enumerate(joints_fpo):
 
@@ -58,7 +55,7 @@ def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:
 
         #   TODO: check -> joint frame in world at q=0
         #   Correct form across nested/linked sub-assemblies. Matches the
-        #   `UtilsAssembly.getJcsGlobalPlc` helper (= getGlobalPlacement * jcs).
+        #   `UtilsAssembly.getJcsGlobalPlc` helper (= getGlobalPlacement * jcs)
         #   Do NOT use `parent_obj.Placement * j.Placement1` directly — that
         #   only works for top-level App::Part children.
 
@@ -85,17 +82,16 @@ def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:
         rel = joint_world.inverse().multiply(jcs2_world)
         z_dot = rel.Rotation.multVec(V3(0, 0, 1)).z
 
-        # Axis detection sanity check
-        if abs(z_dot) < 0.9:
-            fcl_err(f"joint '{j.Label}': JCS z-axes not (anti)parallel "
-                    f"(z_dot={z_dot:.3f}) — extracted chain may be wrong\n")
+        # Axis direction
+        # effective axis = z detected axis x direction
+        d = dirs[idx]
+        axis: V3 = V3(0, 0, (1 if z_dot < 0 else -1) * d)
 
-        axis: V3 = V3(0, 0, 1) if z_dot < 0.0 else V3(0, 0, -1)
+        # joint limits
+        low, high = doc_limits_deg(j)
+        if d == -1:
+            low, high = -high, -low
 
-        low: float = float(j.AngleMin if
-                           getattr(j, "EnableAngleMin", False) else -180.00)
-        high: float = float(j.AngleMax if
-                            getattr(j, "EnableAngleMax", False) else 180.00)
 
         joints.append(JointSpec(
             name=j.Label or f"joint{idx:02d}",
@@ -104,7 +100,6 @@ def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:
             axis=axis,
             lim_low=deg_to_rad(low),
             lim_high=deg_to_rad(high),
-            # dir_sign=int(dirs[idx]),
         ))
         links.append(LinkSpec(
             name=child_obj.Name,
@@ -133,3 +128,27 @@ def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:
         links=links,
         joints=joints,
     )
+
+
+def joint_dirs(robot_obj: "App.DocumentObject") -> List[int]:
+    """
+    q (angle used by kinematic chains) = dir * yaw (angle stored in fc)
+    """
+    joints = list(robot_obj.Robot_joints or [])
+
+    # get the joint dirs and 1 pad if not of same length as num joints
+    dirs = list(getattr(robot_obj, "Robot_joints_dir", [])
+                or [])[:len(joints)]
+    dirs += [1] * (len(joints) - len(dirs))
+
+    return [-1 if d < 0 else 1 for d in dirs]
+
+
+def doc_limits_deg(j: "App.DocumentObject") -> tuple:
+    """
+    joint limits in fc yaw angle convention
+    """
+    low = float(j.AngleMin) if getattr(j, "EnableAngleMin", False) else -180
+    high = float(j.AngleMax) if getattr(j, "EnableAngleMax", False) else 180
+
+    return low, high

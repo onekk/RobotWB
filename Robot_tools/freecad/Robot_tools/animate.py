@@ -18,7 +18,7 @@ import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
 
 # Layouts and Policy
-from PySide import QtGui  # type: ignore
+from PySide import QtGui, QtCore  # type: ignore
 from PySide.QtWidgets import (  # type: ignore
     QApplication,  QFrame, QGroupBox, QLabel,
     QHBoxLayout,  QGridLayout,  QSizePolicy)
@@ -28,6 +28,7 @@ from freecad.Robot_tools.rbt_helpers_ui import (
     cm_lbl,
     cm_dspb, cm_slider, cm_toggle,
     cm_scroll,
+    cm_tool_btn,
     getObjByName, set_wid_text,
     msg_box
 )
@@ -37,6 +38,11 @@ from freecad.Robot_tools.rbt_helpers_doc import (
 )
 
 from freecad.Robot_tools.rbt_helpers_math import roundrot, roundvec
+
+from freecad.Robot_tools.App.rbt_kine import (
+    joint_limits_q_deg, set_q_deg, current_q_deg,
+    save_home, home_q_deg, joint_dirs
+    )
 
 """
 ----------------------------------------
@@ -106,12 +112,15 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm, low, hi, sl_scale=1):
     gbx_l.addWidget(dspb_jnt, row, 1, 1, 1)
 
     # Col 2 : Min limit label
-    lbl_jmin = cm_lbl(dlg, f"lbl_jmin{jr}", f"{low:g}°", fnt, 0, l_aln=2)
-    gbx_l.addWidget(lbl_jmin, row, 2, 1, 1)
+    # lbl_jmin = cm_lbl(dlg, f"lbl_jmin{jr}", f"{low:g}°", fnt, 0, l_aln=2)
+    # gbx_l.addWidget(lbl_jmin, row, 2, 1, 1)
 
     # Col 3 : Angle reducing nudger
-    btn_jnt_m = cm_btn(dlg, f"btn_jnt_m{jr}", "❮", fnt, 0)
-    btn_jnt_m.setFixedWidth(22)
+
+    btn_jnt_m = cm_tool_btn(dlg, f"btn_jnt_m{jr}", "", fnt)
+    btn_jnt_m.setArrowType(QtCore.Qt.LeftArrow)
+    btn_jnt_m.setToolTip(f"min: {low:g}°")
+    btn_jnt_m.setFixedWidth(18)
     # was: setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(btn_jnt_m, row, 3, 1, 1)
 
@@ -120,14 +129,16 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm, low, hi, sl_scale=1):
     gbx_l.addWidget(sl_jnt, row, 4, 1, 1)
 
     # col 5 : Angle increasing nudger
-    btn_jnt_p = cm_btn(dlg, f"btn_jnt_p{jr}", "❯", fnt, 0)
-    btn_jnt_p.setFixedWidth(22)
+    btn_jnt_p = cm_tool_btn(dlg, f"btn_jnt_p{jr}", "", fnt)
+    btn_jnt_p.setArrowType(QtCore.Qt.RightArrow)
+    btn_jnt_p.setToolTip(f"max: {hi:g}°")
+    btn_jnt_p.setFixedWidth(18)
     # was: setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(btn_jnt_p, row, 5, 1, 1)
 
     # col 6 : max limit label
-    lbl_jmax = cm_lbl(dlg, f"lbl_jmax{jr}", f"{hi:g}°", fnt, 0)
-    gbx_l.addWidget(lbl_jmax, row, 6, 1, 1)
+    # lbl_jmax = cm_lbl(dlg, f"lbl_jmax{jr}", f"{hi:g}°", fnt, 0)
+    # gbx_l.addWidget(lbl_jmax, row, 6, 1, 1)
 
     # col 7 — flip toggle (checked == reversed direction)
     chk_flip = cm_toggle(dlg, f"chk_flip{jr}", fnt)
@@ -185,11 +196,6 @@ class AnimationController:
         self.j_step = 1.0  # step increment size for angles
         self.j_vals = [0.0] * self.j_num  # joint values
 
-        # default vals if no <<Robot_joints_dir>> yet
-        if not robot_obj.Robot_joints_dir:
-            robot_obj.Robot_joints_dir = [1] * self.j_num
-        self.j_dirs = list(robot_obj.Robot_joints_dir)
-
         # if not hasattr(robot_obj, "Robot_home_pos"):
         #     robot_obj.addProperty(
         #         "App::PropertyFloatList", "Robot_home_pos", "Robot",
@@ -198,40 +204,14 @@ class AnimationController:
         #     robot_obj.Robot_home_pos = list(self.j_vals)
         # self.j_home = list(robot_obj.Robot_home_pos)
 
-        # init home pose if it exists
-        if not robot_obj.Robot_home_pos:
-            robot_obj.Robot_home_pos = self.j_vals
-        self.j_home = list(robot_obj.Robot_home_pos)
-
-    # helpers
-
-    def get_joint_limits(self, j_idx):
-        """Returns (min, max) range for current angle"""
-        jnt = self.robot.Robot_joints[j_idx]
-        low = jnt.AngleMin if getattr(jnt, "EnableAngleMin", False) else -180
-        high = jnt.AngleMax if getattr(jnt, "EnableAngleMax", False) else 180
-        return float(low), float(high)
-
     # robot state mutations
-
-    def set_joint_angle(self, j_idx, value):
-        """Sets joint angle to given value"""
-        joint = self.robot.Robot_joints[j_idx]
-        angle = value * self.j_dirs[j_idx]  # flip ccw/cw if checkbox enabled
-        joint.Offset2 = Placement(VEC0, Rotation(angle, 0, 0))
-        joint.recompute()
-
-        #  link the tool
-        tool = getattr(self.robot, "Active_tool", None)
-        if tool:
-            tool.recompute()
 
     def set_joint_angle_clamped(self, j_idx, value):
         """Checks joint limits before setting joint angles"""
-        low, high = self.get_joint_limits(j_idx)
+        low, high = joint_limits_q_deg(self.robot, j_idx)
         value = max(low, min(high, value))
         self.j_vals[j_idx] = value
-        self.set_joint_angle(j_idx, value)
+        set_q_deg(self.robot, j_idx, value)
         return value
 
     def step_joint(self, j_idx, sign):
@@ -239,37 +219,23 @@ class AnimationController:
         # rebase on the document first as
         # user may have moved the robot using
         # ik drag since last update
-        yaw, _, _ = self.robot.Robot_joints[j_idx].Offset2.Rotation.toEuler()
-        self.j_vals[j_idx] = float(yaw) / self.j_dirs[j_idx]
+        self.j_vals[j_idx] = current_q_deg(self.robot)[j_idx]
         new_val = self.j_vals[j_idx] + sign * self.j_step
         self.j_vals[j_idx] = new_val
         self.set_joint_angle_clamped(j_idx, new_val)
         return new_val
 
-    def save_home_pos(self):
-        """Saves the curr pose as home position"""
-        # self.j_home = list(self.j_vals)
-        # store the doc-space angles so we are not affected
-        # by the direction flips later
-        self.j_home = [float(j.Offset2.Rotation.toEuler()[0])
-                       for j in self.robot.Robot_joints]
-        self.robot.Robot_home_pos = self.j_home
-
     def go_home_pos(self):
         """Set home pos joint angle values"""
-        for idx, val in enumerate(self.j_home):
+        for idx, q in enumerate(home_q_deg(self.robot)):
             # set the angles, in consideration of the joint directions
-            self.set_joint_angle_clamped(idx, val / self.j_dirs[idx])
+            self.set_joint_angle_clamped(idx, q)
 
     def sync_joints_from_doc(self):
         """
         Re-read j_vals from document (Offset2)
         """
-        for i, jnt in enumerate(self.robot.Robot_joints):
-            yaw, _, _ = jnt.Offset2.Rotation.toEuler()
-
-            # convert from doc-space to panel space
-            self.j_vals[i] = float(yaw / self.j_dirs[i])
+        self.j_vals = list(current_q_deg(self.robot))
 
     def reset_joints(self):
         """reset joints to original val"""
@@ -292,17 +258,12 @@ class AnimationController:
             jnt.Offset2 = of2
             asm.recompute()
 
-    def reload_dirs(self):
-        """reload joints directory"""
-        self.j_dirs = list(self.robot.Robot_joints_dir)
-
     # debug
 
     def debug_dump_state(self, op_nm):
         fcl_msg(
             f"----- {op_nm} -----\n"
             f"- j_num : {self.j_num}\n"
-            f"- j_dirs: {self.j_dirs}\n"
             f"- j_nms : {self.j_nms}\n"
             f"- j_step: {self.j_step}\n"
             f"- j_vals: {self.j_vals}\n"
@@ -386,7 +347,7 @@ class AnimationTaskPanel:
         # -- Joint Rows --
         brow = 1
         for idx, jnm in enumerate(self.ctrl.j_nms):
-            low, hi = self.ctrl.get_joint_limits(idx)
+            low, hi = joint_limits_q_deg(self.robot, idx)
             create_link_row(self.form, tp_gb0l, brow, self.fnt,
                             f"{idx + 1:02d}", jnm, low, hi)
             brow += 1
@@ -472,6 +433,37 @@ class AnimationTaskPanel:
                 sl.setValue(int(value * sl._scale))
                 sl.blockSignals(False)
 
+    def refresh_row_limits(self, j_idx):
+        """
+        Push q-joint space limits + values into row widgets
+        """
+        low, hi = joint_limits_q_deg(self.robot, j_idx)
+        val = self.ctrl.j_vals[j_idx]
+        nm = f"{j_idx + 1:02d}"
+        # spinbox
+        sb = getObjByName(self.form, f"dspb_jnt{nm}")
+        if sb is not None:
+            sb.blockSignals(True)
+            sb.setRange(low, hi)
+            sb.setValue(val)
+            sb.blockSignals(False)
+
+        # slider
+        sl = getObjByName(self.form, f"sl_jnt{nm}")
+        if sl is not None:
+            sl.blockSignals(True)
+            sl.setRange(int(low * sl._scale), int(hi * sl._scale))
+            sl.setValue(int(val * sl._scale))
+            sl.blockSignals(False)
+
+        # increment/decremnt buttons
+        bm = getObjByName(self.form, f"btn_jnt_m{nm}")
+        if bm is not None:
+            bm.setToolTip(f"min: {low:g}°")
+        bp = getObjByName(self.form, f"btn_jnt_p{nm}")
+        if bp is not None:
+            bp.setToolTip(f"max: {hi:g}°")
+
     def sync_panel_from_doc(self):
         """Pull joint state from the document into ctrl and the widgets."""
         self.ctrl.sync_joints_from_doc()
@@ -492,14 +484,18 @@ class AnimationTaskPanel:
             self.refresh_row(j_n, 0.0)
 
     def _on_reload_dirs(self):
-        self.ctrl.reload_dirs()
+        dirs = joint_dirs(self.robot)
         for j_n in range(self.ctrl.j_num):
-            ck = getObjByName(self.form, f"chk_flip{j_n + 1:02d}")
+            ck = getObjByName(self.form, f"chk_flip{j_n+1:02d}")
             if ck is not None:
                 ck.blockSignals(True)
-                ck.setChecked(self.ctrl.j_dirs[j_n] == -1)
+                ck.setChecked(dirs[j_n] == -1)
                 ck.blockSignals(False)
+
         self.sync_panel_from_doc()
+        for j_n in range(self.ctrl.j_num):
+            self.refresh_row_limits(j_n)
+
 
     def _on_debug_dump(self):
         self.ctrl.debug_dump_state("Dbg Values")
@@ -514,22 +510,20 @@ class AnimationTaskPanel:
         self.refresh_row(j_idx, new_val, skip="slider")
 
     def _on_flip(self, j_idx, checked):
-        self.ctrl.j_dirs[j_idx] = -1 if checked else 1
+        dirs = joint_dirs(self.robot)
+        dirs[j_idx] = -1 if checked else 1
 
-        # mirror to FPO so it persists
-        dirs = list(self.robot.Robot_joints_dir)
-
-        dirs[j_idx] = self.ctrl.j_dirs[j_idx]
+        # invalidate & trigger recreation of kin chain
         self.robot.Robot_joints_dir = dirs
 
-        # reapply angle on flip
-        self.ctrl.set_joint_angle(j_idx, self.ctrl.j_vals[j_idx])
+        self.ctrl.sync_joints_from_doc()
+        self.refresh_row_limits(j_idx)
 
     def _on_step_changed(self, value):
         self.ctrl.j_step = float(value)
 
     def _on_set_home(self):
-        self.ctrl.save_home_pos()
+        save_home(self.robot)
 
     def _on_go_home(self):
         self.ctrl.go_home_pos()
@@ -552,8 +546,15 @@ class AnimationTaskPanel:
         for j_n, jnt in enumerate(self.ctrl.robot.Robot_joints):
             if dbg_s:
                 fcl_msg(f"{j_n} {jnt.Label}")
-            set_wid_text(p_wid, f"lbl_jnt{j_n + 1:02d}", QLabel,
-                         f"<b>{jnt.Label}</b>")
+
+            # shorten the joint names to J<idx> to save UI space
+            # set_wid_text(p_wid, f"lbl_jnt{j_n + 1:02d}", QLabel,
+            #              f"<b>{jnt.Label}</b>")
+            lbl = p_wid.findChild(QLabel, f"lbl_jnt{j_n + 1:02d}")
+            if lbl is not None:
+                lbl.setText(f"<b>J{j_n+1}</b>")
+                lbl.setToolTip(jnt.Label)  # full name on hover
+
             # Assign to increase angle button the action
             btn_p_nm = f"btn_jnt_p{j_n + 1:02d}"
             btn_p = getObjByName(p_wid, btn_p_nm)
@@ -572,10 +573,6 @@ class AnimationTaskPanel:
                                       idx=j_n: self._on_step(idx, -1))
             else:
                 fcl_err(f"button - for {btn_m_nm} not found!")
-            # set the dir label
-            set_wid_text(
-                p_wid, f"lbl_jdir{j_n + 1:02d}", QLabel,
-                f"<b>{self.ctrl.j_dirs[j_n]}</b>")
 
             # joint val and flip
             nm = f"{j_n + 1:02d}"
@@ -587,7 +584,7 @@ class AnimationTaskPanel:
                                     idx=j_n: self._on_slider(idx, raw))
 
             ck = getObjByName(p_wid, f"chk_flip{nm}")
-            ck.setChecked(self.ctrl.j_dirs[j_n] == -1)
+            ck.setChecked(joint_dirs(self.robot)[j_n] == -1)
             ck.toggled.connect(lambda c, idx=j_n: self._on_flip(idx, c))
 
 

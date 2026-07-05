@@ -17,7 +17,7 @@ import FreeCADGui as Gui
 from PySide import QtGui, QtCore  # noqa  # QtWidgets
 from PySide.QtWidgets import (  # noqa
     QApplication, QCheckBox,  QFrame, QGroupBox, QLabel, 
-    QLineEdit, QPlainTextEdit, QDoubleSpinBox, QSlider,
+    QLineEdit, QPlainTextEdit, QDoubleSpinBox, QSlider, QToolButton,
     QPushButton, QSpinBox, QTabWidget, QTextEdit, QWidget,  # Widgets
     QDialog, QFileDialog, QInputDialog, QMessageBox,  # Dialogs
     QGridLayout, QVBoxLayout, QScrollArea, QSizePolicy)  # Layouts and Policy
@@ -113,6 +113,16 @@ def cm_btn(parent, b_nm, b_txt, b_fnt, b_tfm):
     button.setAutoDefault(False)
 
     return button
+
+
+def cm_tool_btn(parent, b_nm, b_txt, b_fnt):
+    """Create a styled QToolButton."""
+    btn = QToolButton(parent)
+    btn.setObjectName(b_nm)
+    btn.setText(b_txt)
+    btn.setFont(b_fnt)
+    btn.setAutoRaise(True)
+    return btn
 
 
 def cm_lbl(parent, l_nm, l_txt, l_fnt, l_tfm, l_aln=0):

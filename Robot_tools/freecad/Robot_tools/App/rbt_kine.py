@@ -11,7 +11,8 @@ from typing import Dict, List, Optional, Tuple, Type, TypeAlias
 import FreeCAD as App  # type: ignore
 
 from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
-from freecad.Robot_tools.App.rbt_kine_chain import extract_chain
+from freecad.Robot_tools.App.rbt_kine_chain import (
+    extract_chain, joint_dirs, doc_limits_deg)
 from freecad.Robot_tools.rbt_helpers_math import deg_to_rad, rad_to_deg
 from freecad.Robot_tools.backends.base import KinematicsBackend
 
@@ -19,6 +20,7 @@ Placement: TypeAlias = App.Placement
 Chain: TypeAlias = ChainSpec
 
 fcl_err = App.Console.PrintError
+fcl_warn = App.Console.PrintWarning
 fcl_msg = App.Console.PrintMessage
 
 # backend instance : (robot.Name, backend library)
@@ -133,19 +135,40 @@ def get_backend(rbt_obj: "App.DocumentObject",
         return None
 
     # create new backend instance
-    try:
-        lib = backend_lib(name)
+    def load_lib(lib_name: str):
+        lib = backend_lib(lib_name)
         be = lib()
         be.load(chain)
-    except ImportError:
-        fcl_err(f"Kinematics lib '{name}' is not available")
-        return None
-    except Exception as e:
-        fcl_err(f"Failed to load kinematics lib '{name}': {e}\n")
-        fcl_err(traceback.format_exc())
+        return be
+
+    # create new backend instance
+    # try to load user selection, fallback to ikpy
+    libs = [name] if name == "ikpy" else [name, "ikpy"]
+    be = None
+    for lib in libs:
+        try:
+            be = load_lib(lib)
+            break
+        except ImportError:
+            fcl_warn(f"Kin Lib '{lib}' is not available.\n")
+        except Exception as e:
+            fcl_err(f"Failed to load '{lib}': {e}\n")
+            return None
+
+    if be is None:
         return None
 
+    # update the UI if we used fallback
+    if lib != name:
+        try:
+            rbt_obj.Kinematics_lib = lib
+        except Exception:
+            fcl_warn("Unable to update current lib name.\n")
+
+        name = lib
+
     # cache for future reuse & return
+    key = (rbt_obj.Name, name)
     cache[key] = be
     chain_cache[key] = chain
     return be
@@ -168,19 +191,57 @@ def invalidate(rbt_obj: "App.DocumentObject") -> None:
 
 def current_q_deg(rbt_obj: "App.DocumentObject") -> List[float]:
     """
-        Returns the list of current joint angles.
-        Inputs:
-            - rbt_obj: Robot FC Object
+        Canonical URDF style joint angles
+        q = direction * FC Offset2 based yaw
     """
     out: List[float] = []
-    for j in rbt_obj.Robot_joints:
+    for d, j in zip(joint_dirs(rbt_obj), rbt_obj.Robot_joints):
         # offset2 has curr rotation. Z component is what
         # AnimationController writes via Rotation(angle, 0, 0)
         # toEuler() returns (yaw, pitch, roll) in deg
         # TODO: FIX toEuler warp angles to +-180deg
         yaw, _, _ = j.Offset2.Rotation.toEuler()
-        out.append(float(yaw))
+        out.append(d * float(yaw))
     return out
+
+
+def set_q_deg(rbt_obj, j_idx: int, q: float) -> None:
+    """
+    canonical urdf style angle q
+    fc's yaw = dir * q
+    or canonical q = dir * yaw
+    As dir is +-1, above equations are same
+    """
+    d = joint_dirs(rbt_obj)[j_idx]
+    joint = rbt_obj.Robot_joints[j_idx]
+    joint.Offset2 = App.Placement(App.Vector(),
+                                  App.Rotation(d*q, 0, 0))
+    joint.recompute()
+    tool = getattr(rbt_obj, "Active_tool", None)
+    if tool:
+        tool.recompute()
+
+
+def joint_limits_q_deg(rbt_obj, j_idx: int):
+    """
+    q-space limits, considering direction into account
+    """
+    low, high = doc_limits_deg(rbt_obj.Robot_joints[j_idx])
+    if joint_dirs(rbt_obj)[j_idx] == -1:
+        low, high = -high, -low
+    return low, high
+
+
+def save_home(rbt_obj) -> None:
+    """Robot_home_pos in FC yaw convention"""
+    rbt_obj.Robot_home_pos = [float(j.Offset2.Rotation.toEuler()[0])
+                              for j in rbt_obj.Robot_joints]
+
+
+def home_q_deg(rbt_obj) -> List[float]:
+    """q_home = dir * stored yaw home pos"""
+    return [d * float(y) for d, y in zip(joint_dirs(rbt_obj),
+                                         rbt_obj.Robot_home_pos or [])]
 
 
 def get_chain(rbt_obj):
@@ -196,7 +257,7 @@ def get_chain(rbt_obj):
 def apply_joint_angles(rbt_obj, q_deg):
     """
     Use fk to position the parts
-    q_deg is in offset2-yaw convention
+    q_deg is in urdf style q convention
     """
     chain = get_chain(rbt_obj)
     if chain is None:
@@ -236,9 +297,10 @@ def resolve_offsets(rbt_obj, q_deg):
     prev = prefs.GetBool("SolveInJointCreation", True)
     prefs.SetBool("SolveInJointCreation", False)  # avoid calculation at start
     try:
+        dirs = joint_dirs(rbt_obj)
         for i, joint in enumerate(rbt_obj.Robot_joints):
             joint.Offset2 = App.Placement(App.Vector(),
-                                          App.Rotation(q_deg[i], 0, 0))
+                                          App.Rotation(dirs[i]*q_deg[i], 0, 0))
     finally:
         prefs.SetBool("SolveInJointCreation", prev)  # reset to original val
 
@@ -294,11 +356,6 @@ def ik(
     # take last valid joint angles or current angles when
     # no initial values are provided in input
     if q_seed_deg is None:
-        # seed: List[float] = [float(v) for v in (
-        #     getattr(rbt_obj, "Last_q", []) or [])]
-        # if not seed:
-        #     seed = current_q_deg(rbt_obj)
-        # q_seed_deg = seed
         q_seed_deg = current_q_deg(rbt_obj)
 
     # filter out fixed/active joints & convert deg -> rad
@@ -326,9 +383,4 @@ def ik(
     q_deg: List[float] = [next(dof) if m else q for q, m in zip(q_seed_deg,
                                                                 mask)]
 
-    # cache for next seed
-    try:
-        rbt_obj.Last_q = q_deg
-    except Exception:
-        pass
     return q_deg

@@ -75,21 +75,23 @@ class rbt_cmd4:
         """Resources."""
         return {
             'Pixmap': os.path.join(wb_path,
-                                   'resources/icons/rbt_defineRobot.svg'),
+                                   'resources/icons/rbt_createRobot.svg'),
             # 'Accel': "F11",
             'MenuText': "Define Robot",
-            'ToolTip': "<b>Define a Robt from CAD elements</b>"
+            'ToolTip': "<b>Define a Robot from CAD elements</b>"
                 }
 
     def Activated(self):
         """Activated."""
-        from . import define_robot
-        _reload_module("define_robot")
-        define_robot.run()
+        # from . import define_robot
+        # _reload_module("define_robot")
+        # define_robot.run()
+        from freecad.Robot_tools.Gui import taskpanel_rbt_creator
+        taskpanel_rbt_creator.run()
 
     def IsActive(self):
         """IsActive."""
-        return True
+        return not Gui.Control.activeDialog()
 
 
 class rbt_cmd5:

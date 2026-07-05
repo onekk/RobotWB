@@ -41,7 +41,6 @@ class JointSpec:
 
     lim_low: float
     lim_high: float
-    # dir_sign: int  # +1 / -1 Robot_joints_dir
 
 
 @dataclass(frozen=True)

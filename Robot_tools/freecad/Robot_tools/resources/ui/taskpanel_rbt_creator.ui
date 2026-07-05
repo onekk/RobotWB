@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>DefineRobotPanel</class>
+ <widget class="QWidget" name="DefineRobotPanel">
+  <property name="windowTitle">
+   <string>Define Robot</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+    <item>
+    <widget class="QLabel" name="stepHeader">
+      <property name="text"><string>Step 1 of 4 : Import components</string></property>
+      <property name="textFormat"><enum>Qt::RichText</enum></property>
+      <property name="alignment"><set>Qt::AlignHCenter|Qt::AlignVCenter</set></property>
+      <property name="styleSheet"><string>font-size:14px; font-weight:bold;</string></property>
+    </widget>
+    </item>
+    <item>
+    <widget class="QLabel" name="guidanceLabel">
+    <property name="text"><string/></property>
+    <property name="textFormat"><enum>Qt::RichText</enum></property>
+    <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+    </item>
+   <item>
+    <widget class="QGroupBox" name="filesGroup">
+     <property name="title">
+      <string>Robot Files</string>
+     </property>
+     <layout class="QGridLayout" name="filesLayout">
+      <item row="0" column="0">
+       <widget class="QLineEdit" name="importPartsEdit">
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+        <property name="placeholderText">
+         <string>Components .FCStd …</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QPushButton" name="importPartsButton">
+        <property name="text">
+         <string>Import Parts</string>
+        </property>
+        <property name="toolTip">
+         <string>Select the FCStd file that contains the robot components</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   
+   <item>
+    <widget class="QGroupBox" name="partsGroup">
+      <property name="title"><string>Insert Parts</string></property>
+      <layout class="QVBoxLayout" name="partsLayout">
+      <item>
+        <widget class="QLineEdit" name="partsFilterEdit">
+        <property name="clearButtonEnabled"><bool>true</bool></property>
+        <property name="placeholderText"><string>Filter parts…</string></property>
+        </widget>
+      </item>
+      <item>
+        <widget class="QTreeWidget" name="partsList">
+          <property name="alternatingRowColors"><bool>true</bool></property>
+          <property name="toolTip"><string>Click a part to insert it into the assembly</string></property>
+          <column><property name="text"><string>Part</string></property></column>
+          <attribute name="headerHidden"><bool>true</bool></attribute>
+        </widget>
+      </item>
+      </layout>
+    </widget>
+    </item>
+   <item>
+    <widget class="QGroupBox" name="jointsGroup">
+     <property name="title">
+      <string>Joints</string>
+     </property>
+     <layout class="QGridLayout" name="jointsLayout">
+      <item row="0" column="0">
+       <widget class="QPushButton" name="selectFace1Button">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>Select Face 1</string>
+        </property>
+        <property name="toolTip">
+         <string>Pick a mating face on first link</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QPushButton" name="selectFace2Button">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>Select Face 2</string>
+        </property>
+        <property name="toolTip">
+         <string>Pick a mating face on second link</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QCheckBox" name="groundedJointCheck">
+        <property name="text">
+         <string>Grounded joint</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="toolTip">
+         <string>Add the selected link as the fixed base</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="addJointButton">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>Add Joint</string>
+        </property>
+        <property name="toolTip">
+         <string>Create the joint from the picked face(s)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+        <widget class="QPushButton" name="clearFacesButton">
+        <property name="enabled"><bool>false</bool></property>
+        <property name="text"><string>Clear faces</string></property>
+        <property name="toolTip">
+         <string>Discard the current face picks</string>
+        </property>
+        </widget>
+       </item>
+       <item row="2" column="0" colspan="3">
+        <widget class="QLabel" name="pendingFacesLabel">
+        <property name="text"><string/></property>
+        <property name="textFormat"><enum>Qt::RichText</enum></property>
+        <property name="wordWrap"><bool>true</bool></property>
+        
+        </widget>
+      </item>
+      <item row="3" column="0" colspan="3">
+       <widget class="QTableWidget" name="jointsTable">
+        <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+          </sizepolicy>
+        </property>
+        <property name="editTriggers">
+         <set>QAbstractItemView::NoEditTriggers</set>
+        </property>
+        <property name="selectionBehavior">
+         <enum>QAbstractItemView::SelectRows</enum>
+        </property>
+        <column>
+         <property name="text">
+          <string>#</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Type</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Face 1</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Face 2</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Flip</string>
+         </property>
+        </column>
+        <column>
+          <property name="text">
+          <string>Action</string>
+          </property>
+        </column>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="statusLabel">
+     <property name="text">
+      <string>No working assembly.</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="navLayout">
+    <item>
+      <widget class="QPushButton" name="backButton">
+        <property name="text">
+          <string>◀ Back</string>
+        </property>
+        <property name="toolTip">
+         <string>Previous step</string>
+        </property>
+      </widget>
+    </item>
+    <item>
+        <widget class="QPushButton" name="nextButton">
+          <property name="text">
+            <string>Next ▶</string>
+          </property>
+          <property name="toolTip">
+            <string>Next step</string>
+          </property>
+        </widget>
+    </item>
+    </layout>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>10</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

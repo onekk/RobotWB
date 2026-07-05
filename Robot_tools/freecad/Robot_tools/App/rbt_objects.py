@@ -39,19 +39,39 @@ class Robot_obj:
     def __init__(self, obj):
         '''Add some custom properties to our box feature'''
         obj.addProperty(
-            "App::PropertyLink", "Robot_assembly", "Robot", "Robot_assembly")
+            "App::PropertyLinkGlobal",
+            "Robot_assembly",
+            "Robot",
+            "Robot_assembly")
+
         obj.addProperty(
-            "App::PropertyLinkList", "Robot_joints", "Robot", "Robot joints list")
+            "App::PropertyLinkListGlobal",
+            "Robot_joints",
+            "Robot",
+            "Robot joints list")
+
         obj.addProperty(
-            "App::PropertyPlacementList", "Robot_links", "Robot", "Robot link lists")
+            "App::PropertyPlacementList",
+            "Robot_links",
+            "Robot",
+            "Robot link lists")
+
         obj.addProperty(
             "App::PropertyIntegerList", "Robot_joints_dir", "Robot",
-            "Robot joints direction")
+            "Robot joints direction CW/CCW")
+
         obj.addProperty(
-            "App::PropertyLinkList", "Tools", "Tools",
+            "App::PropertyLinkListGlobal",
+            "Tools",
+            "Tools",
             "Tool FPOs attached to the robot")
+
         obj.addProperty(
-           "App::PropertyLink", "Active_tool", "Tools", "Currently active tool")
+           "App::PropertyLinkGlobal",
+           "Active_tool",
+           "Tools",
+           "Currently active tool")
+
         # TODO: this is useful in case of unfinished editing
         obj.addProperty(
             "App::PropertyFile", "STEPFile", "General",
@@ -89,11 +109,10 @@ class Robot_obj:
 
     def onChanged(self, fp, prop):
         '''Do something when a property has changed'''
-        fcl_msg("Change property: " + str(prop) + "\n")
-        if prop in ("Robot_joints", "Robot_joints_dir", "Active_tool",
-                "Kinematics_lib"):
+        # fcl_msg("Change property: " + str(prop) + "\n")
+        if prop in ("Robot_joints", "Robot_joints_dir",
+                    "Active_tool", "Kinematics_lib"):
             try:
-                # TODO: verify if invalidation is really needed
                 invalidate(fp)
             except Exception:
                 pass
@@ -163,6 +182,19 @@ class Robot_obj:
             obj.addProperty(
                 "App::PropertyFloatList", "Last_q", "Kinematics",
                 "last valid robot joints (deg) used as seed for next IK")
+
+        if not hasattr(obj, "Robot_joints_dir"):
+            obj.addProperty(
+                "App::PropertyIntegerList", "Robot_joints_dir",
+                "Robot", "Robot joints direction CW/CCW"
+            )
+
+        n = len(obj.Robot_joints or [])
+        raw_dirs = (obj.Robot_joints_dir or [])[:n]
+        dirs = [(-1 if d < 0 else 1) for d in raw_dirs]
+        dirs += [1] * (n - len(dirs))
+        if dirs != list(raw_dirs):
+            obj.Robot_joints_dir = dirs
 
     def execute(self, fp):
         '''Do something when doing a recomputation, this method is mandatory'''
@@ -236,7 +268,8 @@ class ViewProviderRBo:
         """
 
         """
-        fcl_msg("Change property: " + str(prop))
+        pass
+        # fcl_msg("Change property: " + str(prop))
 
     def dumps(self):
         """
