@@ -282,6 +282,16 @@ class ViewProviderTool:
             else self._drag_frame_rot.multVec(
                 App.Vector(*AXIS_UNITS[self._active_axis])))
 
+        # filter out the degenrate case & fallback to FreeRotation
+        if self._drag_axis_dir is not None:
+            view_dir = App.Vector(*self._view.getViewDirection())
+            # check if the axis points out of the screen
+            if abs(self._drag_axis_dir.dot(view_dir)) > 0.95:
+                fcl_msg("[tool_vp] drag axis parallel to "
+                        "view - free drag fallback\n")
+                self._active_axis = DragMode.FREE
+                self._drag_axis_dir = None
+
         # ==== time profiling ====
         self._t_ik = []
         self._t_apply = []
@@ -289,7 +299,6 @@ class ViewProviderTool:
         self._n_reject = 0
         self._drag_t0 = time.perf_counter()
         self._q_seed = rbt_kine.current_q_deg(self.robot)
-
 
     def _on_drag_motion(self, userdata, event_cb):
         # fcl_msg("-- on drag motion --")
@@ -383,10 +392,12 @@ class ViewProviderTool:
         def mean(v):
             return sum(v) / len(v) if v else 0
 
+        ap_max = max(ap_ms) if ap_ms else 0
+
         fcl_msg(
             f"[drag] {n} solves in {total:.2f}s ({n / total:.1f} fps) | "
             f"ik mean {mean(ik_ms):.1f} / max {max(ik_ms):.1f} ms | "
-            f"apply mean { mean(ap_ms):.1f} / max {max(ap_ms) if ap_ms else 0:.1f} ms | "
+            f"apply mean {mean(ap_ms):.1f} / max {ap_max:.1f} ms | "
             f"rejected {self._n_reject}\n"
         )
         if getattr(self, "_t_split", None):
@@ -495,12 +506,15 @@ class ViewProviderTool:
 
         px, py = event_cb.getEvent().getPosition().getValue()
 
-        ray_start, ray_end = self._view.projectPointToLine(px, py)  # world ray in mm
+        # world ray in mm
+        ray_start, ray_end = self._view.projectPointToLine(px, py)
         ray = ray_end - ray_start
 
         # get a plane through tcp & camera plane normal
         plane_origin = self.drag_start_tcp.Base  # plane through TCP
-        plane_normal = App.Vector(*self._view.getViewDirection())  # camera pl norm.
+
+        # camera pl norm.
+        plane_normal = App.Vector(*self._view.getViewDirection())
 
         ray_dot_normal = ray.dot(plane_normal)
         if abs(ray_dot_normal) < 1e-9:
@@ -517,7 +531,8 @@ class ViewProviderTool:
 
         px, py = event_cb.getEvent().getPosition().getValue()
 
-        ray_start, ray_end = self._view.projectPointToLine(px, py)  # world ray in mm
+        # world ray in mm
+        ray_start, ray_end = self._view.projectPointToLine(px, py)
         axis_origin = self.drag_start_tcp.Base
 
         axis = App.Vector(axis_dir)

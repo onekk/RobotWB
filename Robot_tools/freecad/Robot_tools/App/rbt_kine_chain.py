@@ -52,6 +52,7 @@ def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:
             child_obj: "App.DocumentObject" = j.Reference2[0]
         except Exception as e:
             fcl_err(f"Unable to read parent & child obj: {e}")
+            return None
 
         #   TODO: check -> joint frame in world at q=0
         #   Correct form across nested/linked sub-assemblies. Matches the
@@ -92,7 +93,6 @@ def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:
         if d == -1:
             low, high = -high, -low
 
-
         joints.append(JointSpec(
             name=j.Label or f"joint{idx:02d}",
             type="revolute" if j.JointType == "Revolute" else "fixed",
@@ -113,11 +113,6 @@ def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:
     tool: "Optional[App.DocumentObject]" = getattr(robot_obj,
                                                    "Active_tool", None)
     if tool and getattr(tool, "Flange_link", None) and tool.Flange_link[0]:
-        # flange_world = (UtilsAssembly
-        #                 .getGlobalPlacement(tool.Flange_link)
-        #                 .multiply(UtilsAssembly
-        #                           .findPlacement(tool.Flange_link)))
-
         # use the active tool's tcp as the chain tip
         tcp_world = Placement(tool.TCP_placement)
         flange_local = prev_joint_world.inverse().multiply(tcp_world)

@@ -16,11 +16,11 @@ import FreeCADGui as Gui
 
 from PySide import QtGui, QtCore  # noqa  # QtWidgets
 from PySide.QtWidgets import (  # noqa
-    QApplication, QCheckBox,  QFrame, QGroupBox, QLabel, 
+    QCheckBox,  QFrame, QGroupBox, QLabel,
     QLineEdit, QPlainTextEdit, QDoubleSpinBox, QSlider, QToolButton,
-    QPushButton, QSpinBox, QTabWidget, QTextEdit, QWidget,  # Widgets
-    QDialog, QFileDialog, QInputDialog, QMessageBox,  # Dialogs
-    QGridLayout, QVBoxLayout, QScrollArea, QSizePolicy)  # Layouts and Policy
+    QPushButton, QTextEdit,  # Widgets
+    QFileDialog, QMessageBox,  # Dialogs
+    QGridLayout, QVBoxLayout, QScrollArea)  # Layouts and Policy
 from PySide.QtCore import QObject, Qt  # noqa
 
 from .rbt_constants import ap_clr
@@ -50,20 +50,6 @@ def set_txt_color(txt, col):
 # ------------------------------------------------
 
 
-def cm_chb(parent, o_nm, o_txt, l_fnt, enable=True):
-    """Create a styled QLabel."""
-    chb = QCheckBox(parent)
-    chb.setObjectName(o_nm)
-    chb.setText(o_txt)
-
-    if enable is True:
-        chb.setEnabled(True)
-    else:
-        chb.setEnabled(False)
-
-    return chb
-
-
 def cm_gbx(parent, gb_nm, gb_lbl, gbl_nm="", style="bold", blay=0):
     """Create a groupbox container and return it."""
     gpbx = QGroupBox(gb_lbl)
@@ -91,26 +77,18 @@ def cm_gbx(parent, gb_nm, gb_lbl, gbl_nm="", style="bold", blay=0):
     return gpbx, gpbxl
 
 
-def cm_btn(parent, b_nm, b_txt, b_fnt, b_tfm):
+def cm_btn(parent, b_nm, b_txt, b_fnt):
     """Create a styled QPushButton."""
     button = QPushButton()
     button.setObjectName(b_nm)
-    button.setFont = b_fnt
+    button.setFont(b_fnt)
     button.setAutoDefault(False)
-
-    if b_tfm == 1:
-        button.setTextFormat(Qt.RichText)
-    else:
-        pass
-
     button.setText(b_txt)
 
     if parent is None:
         pass
     else:
         button.setParent(parent)
-
-    button.setAutoDefault(False)
 
     return button
 
@@ -159,60 +137,6 @@ def cm_lbl(parent, l_nm, l_txt, l_fnt, l_tfm, l_aln=0):
         label.setParent(parent)
 
     return label
-
-
-def cm_ledit(parent, t_nm, t_fnt, t_hei):
-    """Create a styled QLineEdit.
-
-       t_hei (int): text field height
-    """
-    #
-    text_f = QLineEdit()
-    text_f.setObjectName(t_nm)
-    text_f.setFont(t_fnt)
-
-    if t_hei > 0:
-        text_f.setFixedHeight(t_hei)
-
-    if parent is None:
-        pass
-    else:
-        text_f.setParent(parent)
-
-    return text_f
-
-
-def cm_txt(parent, t_nm, t_fnt, t_hei, rich=True):
-    """Create a styled QTextEdit or QPlainTextEdit.
-
-    Args:
-        parent(QObject): parent widget
-        t_nm (str): text name
-        t_fnt (QFont): text font
-        t_hei (int): text field height
-
-    Returns:
-        text (QtWidget): text
-    """
-    #
-    if rich is False:
-        text_f = QPlainTextEdit()
-    else:
-        text_f = QTextEdit()
-
-    text_f.setObjectName(t_nm)
-    text_f.setFont(t_fnt)
-    text_f.setReadOnly(True)
-
-    if t_hei > 0:
-        text_f.setFixedHeight(t_hei)
-
-    if parent is None:
-        pass
-    else:
-        text_f.setParent(parent)
-
-    return text_f
 
 
 def cm_dspb(parent, sb_nm, sb_fnt, sb_min=-180, sb_max=180,
@@ -268,27 +192,6 @@ def cm_scroll(parent, sa_nm, inner_wd):
     return sa
 
 
-def get_dir(parent, fnt, pre_dir=""):
-    """Get a directory from a file dialog."""
-    f_name = None
-    cf_dia = QFileDialog(parent)
-    cf_dia.setFileMode(QFileDialog.Directory)
-    #
-    if pre_dir != "":
-        cf_dia.setDirectory(pre_dir)
-
-    if cf_dia.exec():
-        f_nms = cf_dia.selectedFiles()
-        if len(f_nms) != 1:
-            msg_box(
-                parent, "You must select only one file.", fnt, "w", 'WARNING:', "w")
-            f_name = None
-        else:
-            f_name = f_nms[0]
-
-    return f_name
-
-
 def get_file(parent, fnt, ftype="fcstd", pre_dir=""):
     """Get a file from a file dialog."""
     f_name = ""
@@ -314,7 +217,9 @@ def get_file(parent, fnt, ftype="fcstd", pre_dir=""):
         f_nms = cf_dia.selectedFiles()
         if len(f_nms) != 1:
             msg_box(
-                parent, "You must select only one file.", fnt, "w", 'WARNING:', "w")
+                parent,
+                "You must select only one file.",
+                fnt, "w", 'WARNING:', "w")
         else:
             f_name = f_nms[0]
 
@@ -356,13 +261,6 @@ def getObjByName(parent, btn_nm):
         return wid
 
 
-def set_wd_prop(wid, prop, val):
-    """Set Qt Widget property."""
-    wid.setProperty(prop, val)
-    wid.style().unpolish(wid)
-    wid.style().polish(wid)
-
-
 def set_wid_text(parent, obj_nm, obj_type, txt):
     """Find an object and set it text."""
     # fcl_msg(parent.children())  # DBG
@@ -371,22 +269,6 @@ def set_wid_text(parent, obj_nm, obj_type, txt):
         return
     else:
         wid.setText(txt)
-
-
-def set_wid_en(parent, obj_nm, state=True):
-    """Find an object by name or a tuple of names and set enabled state."""
-    # fcl_msg(parent.children())  # DBG
-    if isinstance(obj_nm, tuple):
-        obj_tpl = obj_nm
-    else:
-        obj_tpl = (obj_nm, )
-
-    for elem in obj_tpl:
-        wid = parent.findChild(QObject, elem)
-        if wid is None:
-            pass
-        else:
-            wid.setEnabled(state)
 
 
 def load_panel_ui(filename):

@@ -5,22 +5,22 @@ Copyright: 2026
 Licence: LGPL 2.1
 """
 
-import os
-import FreeCADGui as Gui
-import FreeCAD as App
-from . import tb_commands
+# tb_commands imported for side effect:
+# registers the RBT_* commands
+from freecad.Robot_tools import tb_commands  # noqa
 
-from freecad.Robot_tools.App.rbt_objects import Robot_obj, ViewProviderRBo
-
+import FreeCAD as App  # type: ignore
 fc_log_msg = App.Console.PrintMessage
 
+
 tb_pstr = "User parameter:BaseApp/Workbench/Global/Toolbar"
-tb_vers = 1.07
+tb_vers = 1.08
 tb_name = "Robot Tools Toolbar"
 pg_name = "Robot_tools"
 
-tb_cmds = [("RBT_defrob", "RBT"), ("RBT_strob", "RBT"),
-           ("RBT_anrob", "RBT"),("RBT_deftool", "RBT")]
+tb_cmds = [("RBT_defrob", "RBT"),
+           ("RBT_anrob", "RBT"),
+           ("RBT_deftool", "RBT")]
 
 gtb_grp = App.ParamGet(tb_pstr)
 

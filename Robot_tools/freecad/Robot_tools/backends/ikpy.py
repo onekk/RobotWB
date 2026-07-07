@@ -170,8 +170,8 @@ class IkpyBackend:
         # across versions; return None
         # (the Protocol allows None and the workbench's
         # drag handler doesn't use it).
-        raise NotImplementedError
-        # return None
+        # raise NotImplementedError
+        return None
 
     # ---- helpers ----
 

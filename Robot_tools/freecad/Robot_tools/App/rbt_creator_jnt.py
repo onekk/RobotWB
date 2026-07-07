@@ -6,6 +6,7 @@ Current Support: Revolue Jnts, Base Jnt
 import JointObject   # type: ignore
 import UtilsAssembly  # type: ignore
 
+from freecad.Robot_tools.App.rbt_creator_geom import find_center
 
 # map name to Assembly JointType index
 JOINT_TYPES = {"revolute": 1}
@@ -31,7 +32,7 @@ def add_joint(asm, jtype, refs, label=""):
     proxy = JointObject.Joint(j, JOINT_TYPES[jtype])
     JointObject.ViewProviderJoint(j.ViewObject)
     (o1, r1), (o2, r2) = refs[0], refs[1]
-    j.Reference1, j.Reference2 = (o1, [r1, r1]), (o2, [r2, r2])
+    j.Reference1, j.Reference2 = find_center(o1, r1), find_center(o2, r2)
     proxy.preSolve(j, savePlc=False)
     # proxy.matchJCS(j, savePlc=False, reverse=proxy.areJcsSameDir(j))
     asm.Document.recompute()

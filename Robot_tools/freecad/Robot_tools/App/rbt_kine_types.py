@@ -5,7 +5,7 @@ kinematic data-structures for robot fk & ik
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Union, TypeAlias
+from typing import List, Literal, Optional, TypeAlias
 
 
 import FreeCAD as App  # type: ignore
@@ -13,7 +13,6 @@ import FreeCAD as App  # type: ignore
 # --------------------
 V3: TypeAlias = App.Vector
 Placement: TypeAlias = App.Placement
-Number: TypeAlias = Union[int, float]
 JointType: TypeAlias = Literal["revolute", "prismatic", "fixed"]
 # --------------------
 
@@ -68,7 +67,7 @@ class ChainSpec:
         - base_world: Placement of the base frame wrt world
         - flange_local: TCP when tool is configured else last joint frame
         - links: List of links
-        - joints: List of joitns
+        - joints: List of joints
     """
     base_world: Placement  # world -> base
     flange_local: Placement  # last jnt frame -> flange

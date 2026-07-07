@@ -8,11 +8,6 @@ Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
 Licence: LGPL 2.1
 """
-__version__ = "0.07"
-__build__ = "20260508_1245"
-
-
-import pathlib
 
 import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
@@ -29,15 +24,9 @@ from freecad.Robot_tools.rbt_helpers_ui import (
     cm_dspb, cm_slider, cm_toggle,
     cm_scroll,
     cm_tool_btn,
-    getObjByName, set_wid_text,
+    getObjByName,
     msg_box
 )
-
-from freecad.Robot_tools.rbt_helpers_doc import (
-    switch_document
-)
-
-from freecad.Robot_tools.rbt_helpers_math import roundrot, roundvec
 
 from freecad.Robot_tools.App.rbt_kine import (
     joint_limits_q_deg, set_q_deg, current_q_deg,
@@ -65,27 +54,12 @@ fcl_err = App.Console.PrintError
 fcl_msg = App.Console.PrintMessage
 fcl_warn = App.Console.PrintWarning
 
-
-MODULE_PATH = pathlib.Path(__file__).parent
-
-if str(MODULE_PATH.stem) == "Robot_test":
-    pg_name = "Robot test"
-    fcl_msg("Running on Robot Test\n")
-elif str(MODULE_PATH.stem) == "Robot_tools":
-    pg_name = "Robot Tools"
-    fcl_msg("Running on Robot Tools\n")
-else:
-    pg_name = "Standalone"
-    fcl_msg("Running from command line\n")
-
-
 V3 = App.Vector
 Rotation = App.Rotation
 Placement = App.Placement
 
 
 VEC0 = V3(0, 0, 0)
-ROT0 = Rotation(0, 0, 0)
 
 # ------------------------------------------------
 #                 Module functions
@@ -144,46 +118,10 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm, low, hi, sl_scale=1):
     chk_flip = cm_toggle(dlg, f"chk_flip{jr}", fnt)
     gbx_l.addWidget(chk_flip, row, 7, 1, 1)
 
-
-def print_joints(obj):
-    """Show joints info on Report View."""
-    for joint in obj.Joints:
-        # fcl_msg(dir(joint))
-        if joint.JointType == "Revolute":
-            jref1 = joint.Reference1
-            jpl1 = joint.Placement1
-            jpl1_b = roundvec(jpl1.Base)
-            jpl1_r = roundrot(jpl1.Rotation.toEuler())
-            jref2 = joint.Reference2
-            jpl2 = joint.Placement2
-            jpl2_b = roundvec(jpl2.Base)
-            jpl2_r = roundrot(jpl2.Rotation.toEuler())
-            msg = (
-                f"-- Joint {joint.Name} \n"
-                f"- Type = {joint.JointType}\n"
-                f"- Reference1 = {jref1}\n"
-                f"- Placement1.Base = {jpl1_b}\n"
-                f"- Placement1.Rot = {jpl1_r}\n"
-                f"- Reference2 = {jref2}\n"
-                f"- Placement2.Base = {jpl2_b}\n"
-                f"- Placement2.Rot = {jpl2_r}\n"
-                "\n"
-                )
-            fcl_msg(msg)
-
-
-def find_joint(obj, name):
-    for joint in obj.Joints:
-        # fcl_msg(dir(joint))
-        if joint.JointType == "Revolute":
-            if joint.Name == name:
-                return joint
-    return None
-
-
 # ---------------------------------------------
 #             App Layer
 # ---------------------------------------------
+
 
 class AnimationController:
     """Core app logic for robot FPO interaction"""
@@ -258,18 +196,6 @@ class AnimationController:
             jnt.Offset2 = of2
             asm.recompute()
 
-    # debug
-
-    def debug_dump_state(self, op_nm):
-        fcl_msg(
-            f"----- {op_nm} -----\n"
-            f"- j_num : {self.j_num}\n"
-            f"- j_nms : {self.j_nms}\n"
-            f"- j_step: {self.j_step}\n"
-            f"- j_vals: {self.j_vals}\n"
-            "--------------------------------\n"
-        )
-
 # ---------------------------------------------
 #             GUI Layer
 # ---------------------------------------------
@@ -319,9 +245,15 @@ class AnimationTaskPanel:
         self.form_lay.addWidget(scroll, row, 0, 1, 4)
         # self.form_lay.addWidget(tp_gb0, row, 0, 1, 4)
         self.read_joints_data()
-        switch_document(obj.Document.Name)
+        self.switch_document(obj.Document.Name)
         self.ctrl.set_initial_pose()
         self.sync_panel_from_doc()
+
+    def switch_document(self, doc_name):
+        """Switch a FreeCAD document."""
+        App.setActiveDocument(doc_name)
+        App.ActiveDocument = App.getDocument(doc_name)
+        Gui.ActiveDocument = Gui.getDocument(doc_name)
 
     def create_joint_ui(self):
         """Create Joint UI."""
@@ -374,9 +306,9 @@ class AnimationTaskPanel:
 
         # home pos buttons
         btn_home_go = cm_btn(self.form, "btn_home_go",
-                             "Go Home",  self.fnt, 0)
+                             "Go Home",  self.fnt)
         btn_home_set = cm_btn(self.form, "btn_home_set",
-                              "Set Home", self.fnt, 0)
+                              "Set Home", self.fnt)
         tb_lay.addWidget(btn_home_go)
         tb_lay.addWidget(btn_home_set)
 
@@ -385,9 +317,9 @@ class AnimationTaskPanel:
 
         # reset and reload FPO buttons
         btn_jnts_res = cm_btn(self.form, "btn_jnts_res", "Reset",
-                              self.fnt, 0)
+                              self.fnt)
         btn_jnts_rld = cm_btn(self.form, "btn_jnts_rld", "Reload FPO",
-                              self.fnt, 0)
+                              self.fnt)
         btn_jnts_rld.setToolTip("Reload FPO data ('joints directions')")
         tb_lay.addWidget(btn_jnts_res)
         tb_lay.addWidget(btn_jnts_rld)
@@ -400,13 +332,6 @@ class AnimationTaskPanel:
         btn_home_go.clicked.connect(self._on_go_home)
         btn_home_set.clicked.connect(self._on_set_home)
         dspb_step.valueChanged.connect(self._on_step_changed)
-
-        # debug button on its own row
-        # brow += 1
-        # btn_dbg_div = cm_btn(self.form, "btn_dbg_div", "Dbg IntVar",
-        #                      self.fnt, 0)
-        # btn_dbg_div.clicked.connect(self._on_debug_dump)
-        # tp_gb0l.addWidget(btn_dbg_div, brow, 0, 1, 2)
 
         # column stretch handler
         # only let the slider increase in size
@@ -496,10 +421,6 @@ class AnimationTaskPanel:
         for j_n in range(self.ctrl.j_num):
             self.refresh_row_limits(j_n)
 
-
-    def _on_debug_dump(self):
-        self.ctrl.debug_dump_state("Dbg Values")
-
     def _on_spin(self, j_idx, value):
         new_val = self.ctrl.set_joint_angle_clamped(j_idx, value)
         self.refresh_row(j_idx, new_val, skip="dspb")
@@ -586,7 +507,6 @@ class AnimationTaskPanel:
             ck = getObjByName(p_wid, f"chk_flip{nm}")
             ck.setChecked(joint_dirs(self.robot)[j_n] == -1)
             ck.toggled.connect(lambda c, idx=j_n: self._on_flip(idx, c))
-
 
     # --------------------------------------------
     #      Standard Taskpanel functions

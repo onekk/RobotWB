@@ -6,8 +6,6 @@ import UtilsAssembly   # type: ignore
 
 from freecad.Robot_tools.App.rbt_frames import JogFrame, apply_jog_frames
 
-fcl_msg = App.Console.PrintMessage
-
 TOOL_SCHEMA = [
     ("Tool_shape", "App::PropertyLinkGlobal", "Tool",
      "(optional) CAD for the tool"),
@@ -56,7 +54,7 @@ class Tool:
     def onChanged(self, fp, prop):
         if "Restore" in fp.State:
             return
-        
+
         if prop == "Jog_frames":
             apply_jog_frames(fp)
             return
@@ -170,6 +168,8 @@ class Tool:
 # --------------------------
 #         helpers
 # --------------------------
+
+
 def is_tool_fpo(obj):
     """
     True when obj is of the type "Tool"

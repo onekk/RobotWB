@@ -2,14 +2,10 @@
 
 Name: rbt_constants.py
 
-See Changelog below.
-
 Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
 Licence: LGPL 2.1
 """
-__version__ = "0.01"
-__build__ = "20260507_1256"
 
 ap_clr = {
     "Black": [(0.0, 0.0, 0.0), "#000000"],
@@ -37,4 +33,13 @@ ap_clr = {
     # Additional
     "Aqua": [(0.0, 1.0, 1.0), "#00FFFF"],
     "Orange": [(1.0, 0.647, 0.0), "#FFA500"],
+}
+
+
+DEFAULT_KIN_LIB = "numpy_dls"
+
+PIP_HINTS = {
+    "pinocchio": "pip install pin",
+    "tesseract": "pip install tesseract-robotics",
+    "ikpy": "pip install ikpy",
 }

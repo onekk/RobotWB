@@ -17,7 +17,7 @@ import math
 
 from typing import Union, TypeAlias
 
-import FreeCAD as App
+import FreeCAD as App  # type: ignore
 
 V3: TypeAlias = App.Vector
 Number: TypeAlias = Union[int, float]
@@ -38,7 +38,9 @@ def roundvec(r_vec, prec=6):
 
 def roundrot(r_rot, prec=6):
     """Round value in vectors."""
-    vlist = [round(r_rot[0], prec), round(r_rot[1], prec), round(r_rot[2], prec)]
+    vlist = [round(r_rot[0], prec),
+             round(r_rot[1], prec),
+             round(r_rot[2], prec)]
     return vlist
 
 
@@ -99,4 +101,3 @@ def rad_to_deg(d: Number) -> float:
         converts rad to deg
     """
     return float(d) * DEG_PER_RAD
-

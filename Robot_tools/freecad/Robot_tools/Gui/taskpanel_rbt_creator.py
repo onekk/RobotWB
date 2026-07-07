@@ -42,7 +42,8 @@ GUIDANCE = {
     CreationStep.IMPORT_PARTS:
         "Pick the .FCStd that holds the robot's part bodies",
     CreationStep.CREATE_ASSEMBLY:
-        "left-click on a part to insert it || right-click to remove inserted part",
+        "left-click on a part to insert it "
+        "|| right-click to remove inserted part",
 
     # CreationStep.ADD_JOINTS:
     #    => built dynamically later
@@ -75,7 +76,7 @@ class DefineRobot:
     """
     def __init__(self):
         self.creator = RobotCreator()
-        self.doc = App.ActiveDocument
+        self.doc, self.doc_owner = self.pick_working_doc()
         self.imported_names = set()
         self.doc.openTransaction("Create Robot")
         try:
@@ -90,7 +91,6 @@ class DefineRobot:
             self.form = self.cm_form()
             self.connect()
 
-            self.creator.asm_doc = self.doc
             self.install_observer()
             self.curr_step = CreationStep.IMPORT_PARTS
 
@@ -111,6 +111,27 @@ class DefineRobot:
     @property
     def assembly_doc(self):
         return self.creator.asm_doc
+
+    def pick_working_doc(self):
+        """
+        fresh builds go into a new doc & we
+        reuse the doc when robot fpo pre-exists
+        or the doc is empty (no Objects present)
+        """
+        doc = App.ActiveDocument
+
+        # reuse case : resuming rbt file of empty doc
+        if doc is not None:
+            self.creator.asm_doc = doc
+            # check if the doc contains is rbt or empty
+            if (self.creator.candidate_assemblies()
+                    or not doc.Objects):
+                return doc, False
+
+        # fresh build case
+        doc = App.newDocument("Robot")
+        self.creator.asm_doc = doc
+        return doc, True
 
     def cm_form(self):
         w = load_panel_ui("taskpanel_rbt_creator.ui")
@@ -175,8 +196,52 @@ class DefineRobot:
         self.imported_names |= self.creator.track_imported(before)
         self.imported_parts_file.setText("Parts: "+str(f_name))
 
+        self.group_imported()
+
         # Auto-advance on componenet file selection
         self.set_curr_step(CreationStep.CREATE_ASSEMBLY)
+
+    def group_imported(self):
+        """Stash merged source parts in a hidden 'Elements' group."""
+
+        objs = [
+            obj
+            for obj in (
+                self.doc.getObject(name)
+                for name in self.imported_names
+            )
+            if obj is not None
+            and not obj.isDerivedFrom("App::DocumentObjectGroup")
+        ]
+
+        roots = [
+            obj
+            for obj in objs
+            if not any(
+                parent.Name in self.imported_names
+                for parent in obj.InList
+            )
+        ]
+
+        grp = self.doc.getObject("Elements")
+        if grp is None:
+            grp = self.doc.addObject(
+                "App::DocumentObjectGroup",
+                "Elements",
+            )
+            grp.Label = "Elements"
+            self.imported_names.add(grp.Name)  # so reject() cleans it up too
+
+        grp.Group = list(grp.Group) + [
+            obj
+            for obj in roots
+            if obj not in grp.Group
+        ]
+
+        for obj in roots:
+            obj.Visibility = False
+
+        grp.Visibility = False
 
     # assembly wb helpers
 
@@ -624,11 +689,19 @@ class DefineRobot:
         self.teardown_observer()
         self.doc.abortTransaction()
 
-        for name in list(self.imported_names):
-            if self.doc.getObject(name):
-                self.doc.removeObject(name)
+        # if new file was created (owner=True), but not
+        # saved - drop file. If it was saved by user
+        # then it needs to be deleted by the user on their own
 
-        self.doc.recompute()
+        if self.doc_owner and not self.doc.FileName:
+            App.closeDocument(self.doc.Name)
+        else:
+            for name in list(self.imported_names):
+                if self.doc.getObject(name):
+                    self.doc.removeObject(name)
+
+            self.doc.recompute()
+
         Gui.Control.closeDialog()
         return True
 
@@ -664,6 +737,4 @@ def run():
     if Gui.Control.activeDialog():
         fcl_warn("close the active task panel first \n")
         return
-    if App.ActiveDocument is None:
-        App.newDocument("Robot")
     Gui.Control.showDialog(DefineRobot())

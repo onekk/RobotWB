@@ -11,12 +11,12 @@ Licence: LGPL 2.1
 __version__ = "0.03"
 __build__ = "20260508_1337"
 
-import FreeCADGui as Gui
-import FreeCAD as App
+import FreeCAD as App  # type: ignore
 from freecad.Robot_tools.App.rbt_kine import invalidate
+from freecad.Robot_tools.rbt_constants import DEFAULT_KIN_LIB
 
 # Coin3d import
-from pivy import coin
+from pivy import coin  # type: ignore
 
 """
 ----------------------------------------
@@ -91,11 +91,7 @@ class Robot_obj:
             "Solver to use for FK/IK")
         # add more in future
         obj.Kinematics_lib = ["pinocchio", "tesseract", "ikpy", "numpy_dls"]
-        obj.Kinematics_lib = "numpy_dls"
-
-        obj.addProperty(
-            "App::PropertyFloatList", "Last_q", "Kinematics",
-            "last valid robot joints (deg) used as seed for next IK")
+        obj.Kinematics_lib = DEFAULT_KIN_LIB
 
         obj.Proxy = self
 
@@ -172,16 +168,13 @@ class Robot_obj:
             obj.addProperty(
                 "App::PropertyEnumeration", "Kinematics_lib", "Kinematics",
                 "Solver to use for FK/IK")
-            obj.Kinematics_lib = ["pinocchio", "tesseract", "ikpy", "numpy_dls"]
-            obj.Kinematics_lib = "numpy_dls"
+            obj.Kinematics_lib = ["pinocchio", "tesseract",
+                                  "ikpy", "numpy_dls"]
+            obj.Kinematics_lib = DEFAULT_KIN_LIB
         elif hasattr(obj, "Kinematics_lib") and (len(obj.Kinematics_lib) < 4):
-            obj.Kinematics_lib = ["pinocchio", "tesseract", "ikpy", "numpy_dls"]
-            obj.Kinematics_lib = "numpy_dls"
-
-        if not hasattr(obj, "Last_q"):
-            obj.addProperty(
-                "App::PropertyFloatList", "Last_q", "Kinematics",
-                "last valid robot joints (deg) used as seed for next IK")
+            obj.Kinematics_lib = ["pinocchio", "tesseract",
+                                  "ikpy", "numpy_dls"]
+            obj.Kinematics_lib = DEFAULT_KIN_LIB
 
         if not hasattr(obj, "Robot_joints_dir"):
             obj.addProperty(
@@ -200,16 +193,6 @@ class Robot_obj:
         '''Do something when doing a recomputation, this method is mandatory'''
 
         pass
-        # fcl_msg("Execute reached\n")  # DBG
-        #
-        # if (App.GuiUp
-        #         and fp.Robot_joints
-        #         and fp.Active_tool is None):
-
-        #     from freecad.Robot_tools.Gui.define_tool import create_default_tool
-        #     create_default_tool(fp, name="Default_Tool")
-
-        # fp.recompute()
 
 
 class ViewProviderRBo:
@@ -223,7 +206,8 @@ class ViewProviderRBo:
 
     def attach(self, obj):
         """
-        Setup the scene sub-graph of the view provider, this method is mandatory
+        Setup the scene sub-graph of the view provider,
+        this method is mandatory
         """
         self.ViewObject = obj
         self.Object = obj.Object

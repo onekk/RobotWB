@@ -1,9 +1,4 @@
-"""Tesseract Robotics backend for robot_tools kinematics.
-
-Mirrors KinematicsBackend. Generates URDF + SRDF + kinematics_plugin_config
-YAML to a temp directory and lets Tesseract's plugin factory load them via
-`env.init(FilesystemPath, FilesystemPath, GeneralResourceLocator)`.
-"""
+"""Tesseract Robotics backend for robot_tools kinematics"""
 
 from __future__ import annotations
 
@@ -13,6 +8,7 @@ import os
 import shutil
 import tempfile
 from typing import List, Optional, Tuple
+from xml.sax.saxutils import quoteattr
 
 import numpy as np
 import FreeCAD
@@ -58,6 +54,7 @@ class TesseractBackend:
         self._chain = chain
         self._base_link = chain.links[0].name
 
+        self.close()  # close any prev running instances
         tmpdir = tempfile.mkdtemp(prefix="robot_tools_tess_")
         self._tmpdir = tmpdir
         atexit.register(_safe_rmtree, tmpdir)
@@ -91,6 +88,12 @@ class TesseractBackend:
             )
         self._env = env
         self._kg = kg
+
+    def close(self) -> None:
+        """Release resources owned by this backend"""
+        if self._tmpdir:
+            _safe_rmtree(self._tmpdir)
+            self._tmpdir = None
 
     def fk(self, q_rad: List[float]) -> Placement:
         assert self._chain is not None and self._kg is not None
@@ -127,7 +130,16 @@ class TesseractBackend:
             return None
         if solutions is None or len(solutions) == 0:
             return None
-        return list(np.asarray(solutions[0]).flatten())
+
+        # check with fk pass if the achieved solution is correct
+        sol = list(np.asarray(solutions[0]).flatten())
+        achieved = self.fk(sol)                                   # world, mm
+        dp = (achieved.Base - target.Base).Length / MM_PER_M      # meters
+        rel = target.Rotation.inverted().multiply(achieved.Rotation)
+        if dp > pos_tol or abs(rel.Angle) > rot_tol:
+            return None
+
+        return sol
 
     def jacobian(self, q_rad: List[float]) -> Optional[np.ndarray]:
         assert self._kg is not None
@@ -147,7 +159,8 @@ def _safe_rmtree(path: str) -> None:
 
 
 def _placement_to_iso3(pl: Placement) -> Isometry3d:
-    # FreeCAD Rotation.Q = (x, y, z, w). Quaterniond constructor is (w, x, y, z).
+    # FreeCAD Rotation.Q = (x, y, z, w)
+    # Quaterniond constructor is (w, x, y, z)
     qx, qy, qz, qw = pl.Rotation.Q
     tx = pl.Base.x / MM_PER_M
     ty = pl.Base.y / MM_PER_M
@@ -165,7 +178,9 @@ def _iso3_to_placement(iso: Isometry3d) -> Placement:
     q = Quaterniond(R)
     # FreeCAD Rotation(x, y, z, w)
     return Placement(
-        Vector(float(t[0]) * MM_PER_M, float(t[1]) * MM_PER_M, float(t[2]) * MM_PER_M),
+        Vector(float(t[0]) * MM_PER_M,
+               float(t[1]) * MM_PER_M,
+               float(t[2]) * MM_PER_M),
         Rotation(q.x(), q.y(), q.z(), q.w()),
     )
 
@@ -181,8 +196,8 @@ def _chain_to_urdf_string(chain: ChainSpec, base_link: str) -> str:
     buf.write('<robot name="robot_tools_chain">\n')
 
     for lk in chain.links:
-        buf.write(f'  <link name="{lk.name}"/>\n')
-    buf.write(f'  <link name="{_FLANGE_LINK}"/>\n')
+        buf.write(f'  <link name={quoteattr(lk.name)}/>\n')
+    buf.write(f'  <link name={quoteattr(_FLANGE_LINK)}/>\n')
 
     n_links = len(chain.links)
     for idx, j in enumerate(chain.joints):
@@ -198,9 +213,9 @@ def _chain_to_urdf_string(chain: ChainSpec, base_link: str) -> str:
         rpy = _placement_to_rpy(T)
         jtype = "revolute" if j.type == "revolute" else "fixed"
 
-        buf.write(f'  <joint name="{j.name}" type="{jtype}">\n')
-        buf.write(f'    <parent link="{parent_name}"/>\n')
-        buf.write(f'    <child link="{child_name}"/>\n')
+        buf.write(f'  <joint name={quoteattr(j.name)} type={quoteattr(jtype)}>\n')
+        buf.write(f'    <parent link={quoteattr(parent_name)}/>\n')
+        buf.write(f'    <child link={quoteattr(child_name)}/>\n')
         buf.write(
             f'    <origin xyz="{xyz[0]:.9g} {xyz[1]:.9g} {xyz[2]:.9g}" '
             f'rpy="{rpy[0]:.9g} {rpy[1]:.9g} {rpy[2]:.9g}"/>\n'
@@ -221,8 +236,8 @@ def _chain_to_urdf_string(chain: ChainSpec, base_link: str) -> str:
     fxyz = (F.Base.x / MM_PER_M, F.Base.y / MM_PER_M, F.Base.z / MM_PER_M)
     frpy = _placement_to_rpy(F)
     buf.write('  <joint name="flange_fixed" type="fixed">\n')
-    buf.write(f'    <parent link="{last_link}"/>\n')
-    buf.write(f'    <child link="{_FLANGE_LINK}"/>\n')
+    buf.write(f'    <parent link={quoteattr(last_link)}/>\n')
+    buf.write(f'    <child link={quoteattr(_FLANGE_LINK)}/>\n')
     buf.write(
         f'    <origin xyz="{fxyz[0]:.9g} {fxyz[1]:.9g} {fxyz[2]:.9g}" '
         f'rpy="{frpy[0]:.9g} {frpy[1]:.9g} {frpy[2]:.9g}"/>\n'
