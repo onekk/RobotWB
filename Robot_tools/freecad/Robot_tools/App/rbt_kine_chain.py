@@ -16,7 +16,7 @@ import UtilsAssembly  # type: ignore
 from freecad.Robot_tools.App.rbt_kine_types import (
     ChainSpec, JointSpec, LinkSpec
 )
-from freecad.Robot_tools.rbt_helpers_math import deg_to_rad
+from freecad.Robot_tools.App.rbt_helpers_math import deg_to_rad
 from freecad.Robot_tools.App.rbt_logging import fcl_err
 
 V3: TypeAlias = App.Vector

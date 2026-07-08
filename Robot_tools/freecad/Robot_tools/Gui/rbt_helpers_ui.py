@@ -8,8 +8,6 @@ Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
 Licence: LGPL 2.1
 """
-__version__ = "0.01"
-__build__ = "20260507_1256"
 
 import os
 import FreeCADGui as Gui
@@ -23,7 +21,7 @@ from PySide.QtWidgets import (  # noqa
 from PySide.QtCore import QObject, Qt  # noqa
 
 from .rbt_constants import ap_clr
-from freecad.Robot_tools import tb_locator
+from freecad.Robot_tools import rbt_locator
 
 
 # ------------------------------------------------
@@ -142,7 +140,6 @@ def cm_dspb(parent, sb_nm, sb_fnt, sb_min=-180, sb_max=180,
             sb_dec=2, sb_step=0.1, sb_suf="°"):
     """Creates a styled QDoubleSpinBox"""
     sb = QDoubleSpinBox()
-    sb.setObjectName(sb_nm)
     sb.setObjectName(sb_nm)
     sb.setFont(sb_fnt)
     sb.setDecimals(sb_dec)
@@ -266,6 +263,6 @@ def load_panel_ui(filename):
     """
     Helper to load .ui files located at Gui/resources/ui/<filename>.
     """
-    wb_path = os.path.dirname(tb_locator.__file__)
+    wb_path = os.path.dirname(rbt_locator.__file__)
     ui_path = os.path.join(wb_path, "resources", "ui", filename)
     return Gui.PySideUic.loadUi(ui_path)

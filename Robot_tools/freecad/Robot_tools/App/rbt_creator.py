@@ -6,7 +6,7 @@ import FreeCAD as App  # type: ignore
 import UtilsAssembly   # type: ignore
 
 
-from freecad.Robot_tools.App.rbt_objects import Robot_obj, ViewProviderRBo
+from freecad.Robot_tools.App.rbt_robot import Robot
 from freecad.Robot_tools.App.rbt_creator_asm import (
     create_assembly, add_asm_object, resolve_asm_ref
 )
@@ -109,8 +109,13 @@ class RobotCreator:
         self.asm_doc = doc or self.asm_doc or App.ActiveDocument
         asm = create_assembly(self.asm_doc)
         fpo = self.asm_doc.addObject("App::FeaturePython", "Robot_FPO")
-        Robot_obj(fpo)
-        ViewProviderRBo(fpo.ViewObject)
+        Robot(fpo)
+        if App.GuiUp:
+            # ^This is needed to nest the Robot_assembly and Toools
+            # under the main FPO tree node
+            from Robot_tools.freecad.Robot_tools.Gui.vp_rbt_robot \
+                import ViewProviderRobot
+            ViewProviderRobot(fpo.ViewObject)
         fpo.Robot_assembly = asm
         self.asm_doc.recompute()
         self.bind(asm)

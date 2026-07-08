@@ -13,9 +13,9 @@ import FreeCAD as App  # type: ignore
 from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
 from freecad.Robot_tools.App.rbt_kine_chain import (
     extract_chain, joint_dirs, doc_limits_deg)
-from freecad.Robot_tools.rbt_helpers_math import deg_to_rad, rad_to_deg
+from freecad.Robot_tools.App.rbt_helpers_math import deg_to_rad, rad_to_deg
 from freecad.Robot_tools.backends.base import KinematicsBackend
-from freecad.Robot_tools.rbt_constants import DEFAULT_KIN_LIB, PIP_HINTS
+from freecad.Robot_tools.App.rbt_constants import DEFAULT_KIN_LIB, PIP_HINTS
 from freecad.Robot_tools.App.rbt_logging import fcl_err, fcl_warn
 
 Placement: TypeAlias = App.Placement

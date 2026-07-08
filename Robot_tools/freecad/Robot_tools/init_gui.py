@@ -7,7 +7,7 @@ Licence: LGPL 2.1
 
 # tb_commands imported for side effect:
 # registers the RBT_* commands
-from freecad.Robot_tools import tb_commands  # noqa
+from freecad.Robot_tools.Gui import rbt_commands  # noqa
 
 import FreeCAD as App  # type: ignore
 from freecad.Robot_tools.App.rbt_logging import fcl_msg

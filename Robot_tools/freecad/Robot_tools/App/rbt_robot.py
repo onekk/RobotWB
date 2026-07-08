@@ -1,8 +1,6 @@
-"""Robot Objects.
+"""Robot FreeCAD Python Object
 
-Name: rbt_objects.py
-
-See Changelog below.
+Name: rbt_robot.py
 
 Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
@@ -10,18 +8,17 @@ Licence: LGPL 2.1
 """
 
 import FreeCAD as App  # type: ignore
-from pivy import coin  # type: ignore
 
 from freecad.Robot_tools.App.rbt_kine import invalidate
-from freecad.Robot_tools.rbt_constants import DEFAULT_KIN_LIB
-from freecad.Robot_tools.App.rbt_logging import fcl_msg
+from freecad.Robot_tools.App.rbt_constants import DEFAULT_KIN_LIB
+
 
 # ------------------------------------------------
 #                   Robot Objects
 # ------------------------------------------------
 
 
-class Robot_obj:
+class Robot:
     def __init__(self, obj):
         '''Add some custom properties to our box feature'''
         obj.addProperty(
@@ -78,7 +75,6 @@ class Robot_obj:
 
     def onChanged(self, fp, prop):
         '''Do something when a property has changed'''
-        # fcl_msg("Change property: " + str(prop) + "\n")
         if prop in ("Robot_joints", "Robot_joints_dir",
                     "Active_tool", "Kinematics_lib"):
             try:
@@ -98,7 +94,7 @@ class Robot_obj:
             def _mk(o=obj):
                 if getattr(o, "Active_tool", None) is None:
 
-                    from freecad.Robot_tools.Gui.define_tool \
+                    from freecad.Robot_tools.Gui.taskpanel_rbt_tool \
                         import create_default_tool
 
                     create_default_tool(o, name="Default_Tool")
@@ -150,76 +146,3 @@ class Robot_obj:
         '''Do something when doing a recomputation, this method is mandatory'''
 
         pass
-
-
-class ViewProviderRBo:
-
-    def __init__(self, obj):
-        """
-        Set this object to the proxy object of the actual view provider
-        """
-
-        obj.Proxy = self
-
-    def attach(self, obj):
-        """
-        Setup the scene sub-graph of the view provider,
-        this method is mandatory
-        """
-        self.ViewObject = obj
-        self.Object = obj.Object
-        self.standard = coin.SoGroup()
-        obj.addDisplayMode(self.standard, "Standard")
-        return
-
-    def updateData(self, fp, prop):
-        """
-        If a property of the handled feature has changed.
-          we have the chance to handle this here
-        """
-        return
-
-    def getDisplayModes(self, obj):
-        """
-        Return a list of display modes.
-        """
-        return ["Standard"]
-
-    def getDefaultDisplayMode(self):
-        """
-        Return the name of the default display mode.
-          It must be defined in getDisplayModes.
-        """
-        return "Standard"
-
-    def claimChildren(self):
-        """
-        populates the sub-elements (links, tools etc)
-        under the robot fpo
-        """
-        obj = self.Object
-        kids = []
-        if getattr(obj, "Robot_assembly", None):
-            kids.append(obj.Robot_assembly)
-        # kids.extend(getattr(obj, "Robot_joints", []) or [])
-        kids.extend(getattr(obj, "Tools", []) or [])
-        return kids
-
-    def onChanged(self, vp, prop):
-        """
-
-        """
-        pass
-        # fcl_msg("Change property: " + str(prop))
-
-    def dumps(self):
-        """
-        Called during document saving.
-        """
-        return None
-
-    def loads(self, state):
-        """
-        Called during document restore.
-        """
-        return None

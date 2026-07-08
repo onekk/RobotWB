@@ -6,7 +6,7 @@ backend contract & shared adapters for kin library
 from __future__ import annotations
 from typing import (
     TYPE_CHECKING, List, Optional, Protocol,
-    TypeAlias, runtime_checkable
+    TypeAlias
 )
 
 import FreeCAD as App  # type: ignore
@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 Placement: TypeAlias = App.Placement
 
 
-@runtime_checkable
 class KinematicsBackend(Protocol):
     """
     This class implements a template that you need to

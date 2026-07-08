@@ -11,10 +11,10 @@ from PySide.QtWidgets import (  # type: ignore
     QTreeWidgetItem, QHeaderView)
 
 from freecad.Robot_tools.App.rbt_creator import RobotCreator
-from freecad.Robot_tools.rbt_fc_observer import (
+from freecad.Robot_tools.Gui.rbt_fc_observer import (
     RbtObserver, RbtSelectionObserver)
 from freecad.Robot_tools.App.rbt_logging import fcl_warn
-from freecad.Robot_tools.rbt_helpers_ui import (
+from freecad.Robot_tools.Gui.rbt_helpers_ui import (
     load_panel_ui, get_file, msg_box, set_txt_color)
 
 # --------------------------------------------------------------

@@ -16,7 +16,7 @@ from PySide.QtWidgets import (  # type: ignore
     QApplication,  QFrame, QGroupBox, QLabel,
     QHBoxLayout,  QGridLayout,  QSizePolicy)
 
-from freecad.Robot_tools.rbt_helpers_ui import (
+from freecad.Robot_tools.Gui.rbt_helpers_ui import (
     cm_gbx, cm_btn,
     cm_lbl,
     cm_dspb, cm_slider, cm_toggle,
@@ -31,7 +31,7 @@ from freecad.Robot_tools.App.rbt_kine import (
     save_home, home_q_deg, joint_dirs
 )
 
-from freecad.Robot_tools.App.rbt_logging import (
+from Robot_tools.freecad.Robot_tools.App.rbt_helpers_log import (
     fcl_err, fcl_msg)
 
 V3 = App.Vector

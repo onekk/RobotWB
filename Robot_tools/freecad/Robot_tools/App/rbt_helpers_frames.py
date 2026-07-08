@@ -23,7 +23,7 @@ class JogFrame(str, Enum):
         values list for App::PropertyEnumeration
         """
         return [f.value for f in cls]
-    
+
 
 def apply_jog_frames(tool_fp):
     """

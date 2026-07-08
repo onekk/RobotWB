@@ -1,10 +1,11 @@
 """rbt_tool.py — Tool / TCP document object."""
-__version__ = "0.01"
 
 import FreeCAD as App  # type: ignore
 import UtilsAssembly   # type: ignore
 
 from freecad.Robot_tools.App.rbt_frames import JogFrame, apply_jog_frames
+
+from freecad.Robot_tools.App.rbt_logging import fcl_err
 
 TOOL_SCHEMA = [
     ("Tool_shape", "App::PropertyLinkGlobal", "Tool",
@@ -78,7 +79,7 @@ class Tool:
         """
             Recomputes tcp placement & tool body shape
         """
-        from freecad.Robot_tools.rbt_helpers_math import flip_z_dir
+        from freecad.Robot_tools.App.rbt_helpers_math import flip_z_dir
 
         rob_flange_ref = fp.Flange_link
         if not rob_flange_ref or not rob_flange_ref[0]:
@@ -168,6 +169,32 @@ class Tool:
 # --------------------------
 #         helpers
 # --------------------------
+
+
+def import_shape(rob, path):
+    """
+    import tool geom from .fcstd file
+    - [input] rob : robot fpo (used for Document)
+    - [input] path : .fcstd file path
+    """
+    doc = rob.Document
+    before = {o.Name for o in doc.Objects}
+    doc.mergeProject(path)
+    new_objs = [o for o in doc.Objects if o.Name not in before]
+    shapes = [o for o in new_objs if has_valid_shape(o)]
+    if not shapes:
+        fcl_err("no suitable shape in selected file\n")
+        return None
+    return shapes[0]
+
+
+def tool_parent(tool_fpo):
+    """Return the robot FPO that owns this tool, or None."""
+    if tool_fpo is None:
+        return None
+    return next((r for r in tool_fpo.Document.Objects
+                 if hasattr(r, "Tools") and tool_fpo in r.Tools),
+                None)
 
 
 def has_valid_shape(obj):

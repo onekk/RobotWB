@@ -9,7 +9,8 @@ import FreeCADGui as Gui  # type: ignore
 from pivy import coin  # type: ignore
 from freecad.Robot_tools.App.rbt_logging import fcl_err, fcl_msg
 from freecad.Robot_tools.App.rbt_frames import jog_rotation
-from freecad.Robot_tools.Gui.define_tool import tool_parent, DefineTCP
+from freecad.Robot_tools.App.rbt_tool import tool_parent
+from freecad.Robot_tools.Gui.taskpanel_rbt_tool import DefineTCP
 
 # import kinematic library functions
 from freecad.Robot_tools.App import rbt_kine
@@ -248,8 +249,8 @@ class ViewProviderTool:
 
     def getIcon(self):
         import os
-        from freecad.Robot_tools import tb_locator
-        wb_path = os.path.dirname(tb_locator.__file__)
+        from freecad.Robot_tools import rbt_locator
+        wb_path = os.path.dirname(rbt_locator.__file__)
         return os.path.join(wb_path,
                             "resources/icons/rbt_defineTool.svg")
 
@@ -355,7 +356,6 @@ class ViewProviderTool:
                 self._solve_to(pending)
 
     def _on_drag_finish(self, userdata, dragger):
-        # fcl_msg("-- on drag finish --\n")
         act = getattr(self, "_grab_action", None)
 
         if act is not None:

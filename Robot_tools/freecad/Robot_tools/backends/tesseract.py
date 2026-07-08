@@ -27,7 +27,7 @@ from tesseract_robotics.tesseract_kinematics import (
 )
 
 from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
-from freecad.Robot_tools.App.rbt_logging import fcl_warn
+from Robot_tools.freecad.Robot_tools.App.rbt_helpers_log import fcl_warn
 
 
 MM_PER_M = 1000.0
@@ -213,18 +213,23 @@ def _chain_to_urdf_string(chain: ChainSpec, base_link: str) -> str:
         rpy = _placement_to_rpy(T)
         jtype = "revolute" if j.type == "revolute" else "fixed"
 
-        buf.write(f'  <joint name={quoteattr(j.name)} type={quoteattr(jtype)}>\n')
-        buf.write(f'    <parent link={quoteattr(parent_name)}/>\n')
-        buf.write(f'    <child link={quoteattr(child_name)}/>\n')
+        j_str = f'  <joint name={quoteattr(j.name)} type={quoteattr(jtype)}>\n'
+        l_str = f'    <parent link={quoteattr(parent_name)}/>\n'
+        c_str = f'    <child link={quoteattr(child_name)}/>\n'
+        buf.write(j_str)
+        buf.write(l_str)
+        buf.write(c_str)
         buf.write(
             f'    <origin xyz="{xyz[0]:.9g} {xyz[1]:.9g} {xyz[2]:.9g}" '
             f'rpy="{rpy[0]:.9g} {rpy[1]:.9g} {rpy[2]:.9g}"/>\n'
         )
         if jtype == "revolute":
             ax = j.axis
-            buf.write(
-                f'    <axis xyz="{float(ax.x):.9g} {float(ax.y):.9g} {float(ax.z):.9g}"/>\n'
-            )
+            a_str = f'<axis xyz="{
+                    float(ax.x):.9g} {
+                        float(ax.y):.9g} {
+                            float(ax.z):.9g}"/>\n'
+            buf.write(a_str)
             buf.write(
                 f'    <limit lower="{j.lim_low:.9g}" upper="{j.lim_high:.9g}" '
                 f'effort="100" velocity="1"/>\n'
