@@ -8,7 +8,7 @@ reads:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional, TypeAlias
+from typing import List, Optional, TypeAlias
 
 import FreeCAD as App  # type: ignore
 import UtilsAssembly  # type: ignore
@@ -17,15 +17,10 @@ from freecad.Robot_tools.App.rbt_kine_types import (
     ChainSpec, JointSpec, LinkSpec
 )
 from freecad.Robot_tools.rbt_helpers_math import deg_to_rad
-
-
-fcl_err = App.Console.PrintError
+from freecad.Robot_tools.App.rbt_logging import fcl_err
 
 V3: TypeAlias = App.Vector
 Placement: TypeAlias = App.Placement
-if TYPE_CHECKING:
-    RobotFPO: TypeAlias = App.DocumentObject
-    JointFPO: TypeAlias = App.DocumentObject
 
 
 def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:

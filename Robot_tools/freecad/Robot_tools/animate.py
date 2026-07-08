@@ -1,8 +1,6 @@
 """Robot Animator.
 
-Name: animator.py
-
-See Changelog after import statements.
+Name: animate.py
 
 Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
@@ -31,28 +29,10 @@ from freecad.Robot_tools.rbt_helpers_ui import (
 from freecad.Robot_tools.App.rbt_kine import (
     joint_limits_q_deg, set_q_deg, current_q_deg,
     save_home, home_q_deg, joint_dirs
-    )
+)
 
-"""
-----------------------------------------
-Changelog:
-----------------------------------------
-v0.02 - Converted to make it compatible with the WB and the FPO.
-v0.03 - Added direction field from FPO.
-v0.04 - Some improvements.
-v0.05 - Reworked 'Reload FPO Data' button to avoid unknown problem that causes
-        a buggy  movement commands (it don't honour the steps)
-v0.06 - Starting to adapt to the robot_FPO
-v0.07 - Some hacks to reset the touched overlay icon. Added a check of joints
-        dir data, to avoid initialization error.
-v0.09 - Modded to work on robot_test too.
-      - Some fixes in logic if no Robot_FPO is selected.
-      - Message boxes fixed to show program name and the context.
-"""
-
-fcl_err = App.Console.PrintError
-fcl_msg = App.Console.PrintMessage
-fcl_warn = App.Console.PrintWarning
+from freecad.Robot_tools.App.rbt_logging import (
+    fcl_err, fcl_msg)
 
 V3 = App.Vector
 Rotation = App.Rotation
@@ -66,10 +46,8 @@ VEC0 = V3(0, 0, 0)
 # ------------------------------------------------
 
 
-def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm, low, hi, sl_scale=1):
+def create_link_row(dlg, gbx_l, row, fnt, jr, low, hi):
     """Create a link of buttons for a link."""
-    # txt_wd = cm_lbl(dlg, f"lbl_j{jr}", joint_nm, fnt, 0)
-    # gbx_l.addWidget(txt_wd, row, 0, 1, 1)
 
     # Col 0 : Joint label
     lbl_jnt = cm_lbl(dlg, f"lbl_jnt{jr}", "", fnt, 0)
@@ -85,36 +63,26 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, joint_nm, low, hi, sl_scale=1):
     dspb_jnt.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(dspb_jnt, row, 1, 1, 1)
 
-    # Col 2 : Min limit label
-    # lbl_jmin = cm_lbl(dlg, f"lbl_jmin{jr}", f"{low:g}°", fnt, 0, l_aln=2)
-    # gbx_l.addWidget(lbl_jmin, row, 2, 1, 1)
-
-    # Col 3 : Angle reducing nudger
+    # Col 2 : Angle reducing nudger
 
     btn_jnt_m = cm_tool_btn(dlg, f"btn_jnt_m{jr}", "", fnt)
     btn_jnt_m.setArrowType(QtCore.Qt.LeftArrow)
     btn_jnt_m.setToolTip(f"min: {low:g}°")
     btn_jnt_m.setFixedWidth(18)
-    # was: setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(btn_jnt_m, row, 3, 1, 1)
 
-    # Col 4 : Angle Slider
+    # Col 3 : Angle Slider
     sl_jnt = cm_slider(dlg, f"sl_jnt{jr}", sl_min=low, sl_max=hi)
     gbx_l.addWidget(sl_jnt, row, 4, 1, 1)
 
-    # col 5 : Angle increasing nudger
+    # col 4 : Angle increasing nudger
     btn_jnt_p = cm_tool_btn(dlg, f"btn_jnt_p{jr}", "", fnt)
     btn_jnt_p.setArrowType(QtCore.Qt.RightArrow)
     btn_jnt_p.setToolTip(f"max: {hi:g}°")
     btn_jnt_p.setFixedWidth(18)
-    # was: setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(btn_jnt_p, row, 5, 1, 1)
 
-    # col 6 : max limit label
-    # lbl_jmax = cm_lbl(dlg, f"lbl_jmax{jr}", f"{hi:g}°", fnt, 0)
-    # gbx_l.addWidget(lbl_jmax, row, 6, 1, 1)
-
-    # col 7 — flip toggle (checked == reversed direction)
+    # col 6 — flip toggle (checked == reversed direction)
     chk_flip = cm_toggle(dlg, f"chk_flip{jr}", fnt)
     gbx_l.addWidget(chk_flip, row, 7, 1, 1)
 
@@ -133,14 +101,6 @@ class AnimationController:
         self.j_nms = [f"Joint{n + 1:02d}" for n in range(self.j_num)]  # jnames
         self.j_step = 1.0  # step increment size for angles
         self.j_vals = [0.0] * self.j_num  # joint values
-
-        # if not hasattr(robot_obj, "Robot_home_pos"):
-        #     robot_obj.addProperty(
-        #         "App::PropertyFloatList", "Robot_home_pos", "Robot",
-        #         "Robot home pose (one angle per joint)")
-        # if not robot_obj.Robot_home_pos:
-        #     robot_obj.Robot_home_pos = list(self.j_vals)
-        # self.j_home = list(robot_obj.Robot_home_pos)
 
     # robot state mutations
 
@@ -212,8 +172,6 @@ class AnimationTaskPanel:
         "    text-decoration: none;"
         "}"
     )
-    wrl_file = None
-    csv_file = None
 
     def __init__(self, robot_obj):
         """Canonical Init & set robot obj"""
@@ -281,7 +239,7 @@ class AnimationTaskPanel:
         for idx, jnm in enumerate(self.ctrl.j_nms):
             low, hi = joint_limits_q_deg(self.robot, idx)
             create_link_row(self.form, tp_gb0l, brow, self.fnt,
-                            f"{idx + 1:02d}", jnm, low, hi)
+                            jnm, low, hi)
             brow += 1
 
         # -- one row gap --

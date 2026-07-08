@@ -14,11 +14,10 @@ __build__ = "20260507_1256"
 import os
 import FreeCADGui as Gui
 
-from PySide import QtGui, QtCore  # noqa  # QtWidgets
 from PySide.QtWidgets import (  # noqa
     QCheckBox,  QFrame, QGroupBox, QLabel,
-    QLineEdit, QPlainTextEdit, QDoubleSpinBox, QSlider, QToolButton,
-    QPushButton, QTextEdit,  # Widgets
+    QDoubleSpinBox, QSlider, QToolButton,
+    QPushButton,
     QFileDialog, QMessageBox,  # Dialogs
     QGridLayout, QVBoxLayout, QScrollArea)  # Layouts and Policy
 from PySide.QtCore import QObject, Qt  # noqa
@@ -218,8 +217,10 @@ def get_file(parent, fnt, ftype="fcstd", pre_dir=""):
         if len(f_nms) != 1:
             msg_box(
                 parent,
+                'WARNING:',
+                fnt,
                 "You must select only one file.",
-                fnt, "w", 'WARNING:', "w")
+                "w", "w")
         else:
             f_name = f_nms[0]
 
@@ -259,16 +260,6 @@ def getObjByName(parent, btn_nm):
         return None
     else:
         return wid
-
-
-def set_wid_text(parent, obj_nm, obj_type, txt):
-    """Find an object and set it text."""
-    # fcl_msg(parent.children())  # DBG
-    wid = parent.findChild(obj_type, obj_nm)
-    if wid is None:
-        return
-    else:
-        wid.setText(txt)
 
 
 def load_panel_ui(filename):

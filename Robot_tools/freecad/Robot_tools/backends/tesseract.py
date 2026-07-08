@@ -11,7 +11,6 @@ from typing import List, Optional, Tuple
 from xml.sax.saxutils import quoteattr
 
 import numpy as np
-import FreeCAD
 from FreeCAD import Placement, Rotation, Vector
 
 from tesseract_robotics.tesseract_common import (
@@ -28,6 +27,7 @@ from tesseract_robotics.tesseract_kinematics import (
 )
 
 from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
+from freecad.Robot_tools.App.rbt_logging import fcl_warn
 
 
 MM_PER_M = 1000.0
@@ -126,7 +126,7 @@ class TesseractBackend:
         try:
             solutions = self._kg.calcInvKin(ik_inputs, seed)
         except Exception as e:
-            FreeCAD.Console.PrintWarning(f"[tesseract] ik() raised: {e}\n")
+            fcl_warn(f"[tesseract] ik() raised: {e}\n")
             return None
         if solutions is None or len(solutions) == 0:
             return None
@@ -202,7 +202,7 @@ def _chain_to_urdf_string(chain: ChainSpec, base_link: str) -> str:
     n_links = len(chain.links)
     for idx, j in enumerate(chain.joints):
         if idx + 1 >= n_links:
-            FreeCAD.Console.PrintWarning(
+            fcl_warn(
                 f"[tesseract] joint {j.name!r} has no child link, skipped\n"
             )
             continue

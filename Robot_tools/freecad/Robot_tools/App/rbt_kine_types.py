@@ -73,10 +73,3 @@ class ChainSpec:
     flange_local: Placement  # last jnt frame -> flange
     links: List[LinkSpec]
     joints: List[JointSpec]
-
-    def n_dof(self) -> int:
-        """
-        Returns total DoF by counting non-fixed joints.
-        """
-        return sum(1 for j in self.joints
-                   if j.type != "fixed")

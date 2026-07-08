@@ -8,27 +8,13 @@ Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026
 Licence: LGPL 2.1
 """
-__version__ = "0.03"
-__build__ = "20260508_1337"
 
 import FreeCAD as App  # type: ignore
-from freecad.Robot_tools.App.rbt_kine import invalidate
-from freecad.Robot_tools.rbt_constants import DEFAULT_KIN_LIB
-
-# Coin3d import
 from pivy import coin  # type: ignore
 
-"""
-----------------------------------------
-Changelog:
-----------------------------------------
-v0.01 - Initial version.
-v0.02 - Added the STEPFile property.
-"""
-
-fcl_err = App.Console.PrintError
-fcl_msg = App.Console.PrintMessage
-fcl_warn = App.Console.PrintWarning
+from freecad.Robot_tools.App.rbt_kine import invalidate
+from freecad.Robot_tools.rbt_constants import DEFAULT_KIN_LIB
+from freecad.Robot_tools.App.rbt_logging import fcl_msg
 
 # ------------------------------------------------
 #                   Robot Objects
@@ -76,11 +62,6 @@ class Robot_obj:
         obj.addProperty(
             "App::PropertyFile", "STEPFile", "General",
             "File from where elements have been loaded.")
-        # Added a Version property
-        obj.addProperty(
-            "App::PropertyString", "Version", "Base",
-            "Object version")
-        obj.Version = __version__  # "0.01"
 
         obj.addProperty(
             "App::PropertyFloatList", "Robot_home_pos", "Robot",
@@ -95,14 +76,6 @@ class Robot_obj:
 
         obj.Proxy = self
 
-    def _migrate_from_001(self, obj):
-        """Migrate from version 0.01"""
-        fcl_msg("Migrating FPO to v0.02\n")  # DBG
-
-    def _migrate_from_002(self, obj):
-        """Migrate from version 0.02"""
-        fcl_msg("Migrating FPO to v0.03\n")  # DBG
-
     def onChanged(self, fp, prop):
         '''Do something when a property has changed'''
         # fcl_msg("Change property: " + str(prop) + "\n")
@@ -114,22 +87,6 @@ class Robot_obj:
                 pass
 
     def onDocumentRestored(self, obj):
-        if hasattr(obj, "Version") and obj.Version:
-            fcl_msg("FPO version check\n")  # DBG
-            if obj.Version == "0.01":
-                fcl_msg("FPO is already at v0.01\n")  # DBG
-                pass  # do nothing
-            if obj.Version == "0.02":
-                self._migrate_from_001(obj)
-            elif obj.Version == "0.03":
-                self._migrate_from_002(obj)
-        else:
-            fcl_msg("FPO has no version bumping to v0.01\n")  # DBG
-            obj.addProperty(
-                "App::PropertyString", "Version", "Base",
-                "Object version")
-            obj.Version = "0.01"
-
         # when restoring the document, create a default tool
         # if no active tool is found. TODO: Check if this is
         # really necessary or not

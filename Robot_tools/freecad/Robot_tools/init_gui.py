@@ -10,8 +10,7 @@ Licence: LGPL 2.1
 from freecad.Robot_tools import tb_commands  # noqa
 
 import FreeCAD as App  # type: ignore
-fc_log_msg = App.Console.PrintMessage
-
+from freecad.Robot_tools.App.rbt_logging import fcl_msg
 
 tb_pstr = "User parameter:BaseApp/Workbench/Global/Toolbar"
 tb_vers = 1.08
@@ -29,7 +28,7 @@ def check_tb(tb_grp):
     """Check the toolbar existence."""
     grp_nm = tb_grp.GetGroupName()
     if tb_grp.GetString('Name') == tb_name:
-        fc_log_msg(f"RBT group: {grp_nm}\n")
+        fcl_msg(f"RBT group: {grp_nm}\n")
         if check_vers(tb_grp) is True:
             return True
         else:
@@ -41,13 +40,13 @@ def check_tb(tb_grp):
 def check_vers(tb_grp):
     """Check toolbar version."""
     vers = tb_grp.GetFloat('Vers')
-    fc_log_msg(f"RBT version: {vers}\n")
+    fcl_msg(f"RBT version: {vers}\n")
     if vers < tb_vers:
-        fc_log_msg("RBT version outdated\n")
-        fc_log_msg(f"new version {tb_vers}\n Recreating the ToolBar")
+        fcl_msg("RBT version outdated\n")
+        fcl_msg(f"new version {tb_vers}\n Recreating the ToolBar")
         tb_grp.Clear()
         return False
-    fc_log_msg("RBT version OK")
+    fcl_msg("RBT version OK")
     return True
 
 

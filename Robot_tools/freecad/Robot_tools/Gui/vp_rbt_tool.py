@@ -1,7 +1,5 @@
 """vp_rbt_tool.py — View Provider for Tool & TCP."""
-__version__ = "0.01"
 
-import time
 from enum import IntEnum
 
 
@@ -240,11 +238,7 @@ class ViewProviderTool:
 
     def push_joints(self, robot, q_deg):
         """FK preview during drag"""
-        t0 = time.perf_counter()
         rbt_kine.apply_joint_angles(robot, q_deg)   # FK
-        t_set = time.perf_counter() - t0
-        if getattr(self, "_t_split", None) is not None:
-            self._t_split.append((t_set, 0.0, 0.0))
 
     def getDisplayModes(self, vobj):
         return ["Standard"]
@@ -261,7 +255,6 @@ class ViewProviderTool:
 
     # -- event slots --
     def _on_drag_start(self, userdata, dragger):
-        # fcl_msg("-- on drag start --\n")
         self.f_solving_ik = False
         fp = self.Object
         self.drag_start_tcp = App.Placement(fp.TCP_placement)
@@ -292,25 +285,13 @@ class ViewProviderTool:
                 self._active_axis = DragMode.FREE
                 self._drag_axis_dir = None
 
-        # ==== time profiling ====
-        self._t_ik = []
-        self._t_apply = []
-        self._t_split = []
-        self._n_reject = 0
-        self._drag_t0 = time.perf_counter()
         self._q_seed = rbt_kine.current_q_deg(self.robot)
 
     def _on_drag_motion(self, userdata, event_cb):
-        # fcl_msg("-- on drag motion --")
-
-        # if self.f_solving_ik:
-        #     return
         if self.drag_start_tcp is None:
             return
         if self.robot is None:
             return
-        # if event_cb is None:
-        #     return
         if self._active_axis is None:
             return
 
@@ -341,15 +322,11 @@ class ViewProviderTool:
         self.f_solving_ik = True
         sol = None
 
-        t0 = time.perf_counter()
-
         try:
             sol = rbt_kine.ik(self.robot, target,
                               q_seed_deg=self._q_seed)
         except Exception as e:
             fcl_err(f"failed to solve IK {e}\n")
-
-        self._t_ik.append(time.perf_counter() - t0)
 
         if sol is not None:
             # solving_ik flag is reset in _apply_solution()
@@ -358,7 +335,6 @@ class ViewProviderTool:
             r = self.robot
             QTimer.singleShot(0, lambda s=sol: self._apply_solution(s, r))
         else:
-            self._n_reject += 1
             self.f_solving_ik = False
 
     def _apply_solution(self, q_deg, robot):
@@ -366,48 +342,17 @@ class ViewProviderTool:
             self.f_solving_ik = False
             return
 
-        t0 = time.perf_counter()
         try:
             self.push_joints(robot, q_deg)
         except Exception as e:
             fcl_err(f"Error changing joints: {e}\n")
         finally:
             # reset the flag after solution has been pushed
-            self._t_apply.append(time.perf_counter() - t0)
             self.f_solving_ik = False
 
             pending, self._pending_pos = self._pending_pos, None
             if pending is not None and self.f_dragging:
                 self._solve_to(pending)
-
-    # temp function for performance logging
-    def _print_drag_stats(self):
-        n = len(getattr(self, "_t_ik", []))
-        if n == 0:
-            return
-        total = time.perf_counter() - self._drag_t0
-        ik_ms = [t * 1000 for t in self._t_ik]
-        ap_ms = [t * 1000 for t in self._t_apply]
-
-        def mean(v):
-            return sum(v) / len(v) if v else 0
-
-        ap_max = max(ap_ms) if ap_ms else 0
-
-        fcl_msg(
-            f"[drag] {n} solves in {total:.2f}s ({n / total:.1f} fps) | "
-            f"ik mean {mean(ik_ms):.1f} / max {max(ik_ms):.1f} ms | "
-            f"apply mean {mean(ap_ms):.1f} / max {ap_max:.1f} ms | "
-            f"rejected {self._n_reject}\n"
-        )
-        if getattr(self, "_t_split", None):
-            n2 = len(self._t_split)
-            s = [sum(v[i] for v in self._t_split) / n2 * 1000 for
-                 i in (0, 1, 2)]
-            fcl_msg(
-                f"[apply] set {s[0]:.1f} | asm {s[1]:.1f} | "
-                f"tool {s[2]:.1f} ms (means over {n2})\n"
-            )
 
     def _on_drag_finish(self, userdata, dragger):
         # fcl_msg("-- on drag finish --\n")
@@ -423,7 +368,6 @@ class ViewProviderTool:
         if self.robot is not None and self._q_seed is not None:
             rbt_kine.resolve_offsets(self.robot, self._q_seed)
 
-        self._print_drag_stats()
         self._q_seed = None
         self._active_axis = None
 

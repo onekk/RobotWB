@@ -1,5 +1,4 @@
 """define_tool.py — Create Tool & TCP object."""
-__version__ = "0.01"
 
 import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
@@ -7,10 +6,7 @@ from PySide import QtGui  # type: ignore
 
 from freecad.Robot_tools.App.rbt_tool import Tool
 from freecad.Robot_tools.App.rbt_creator_geom import find_center
-
-fcl_msg = App.Console.PrintMessage
-fcl_warn = App.Console.PrintWarning
-fcl_err = App.Console.PrintError
+from freecad.Robot_tools.App.rbt_logging import fcl_err, fcl_warn
 
 
 # helpers

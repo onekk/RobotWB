@@ -170,14 +170,6 @@ class Tool:
 # --------------------------
 
 
-def is_tool_fpo(obj):
-    """
-    True when obj is of the type "Tool"
-    ie. it has tool flange and tcp link
-    """
-    return hasattr(obj, "Tool_flange_link") and hasattr(obj, "TCP_link")
-
-
 def has_valid_shape(obj):
     """
     True when obj has non null shape
