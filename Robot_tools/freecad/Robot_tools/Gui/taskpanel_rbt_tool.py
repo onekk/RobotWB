@@ -1,12 +1,14 @@
-"""define_tool.py — Create Tool & TCP object."""
+"""taskpanel_rbt_tool.py — Create Tool & TCP object."""
 
 import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
 from PySide import QtGui  # type: ignore
 
-from freecad.Robot_tools.App.rbt_tool import Tool, import_shape
+from freecad.Robot_tools.App.rbt_tool import (
+    Tool, import_shape, has_valid_shape)
 from freecad.Robot_tools.App.rbt_creator_geom import find_center
-from freecad.Robot_tools.App.rbt_logging import fcl_err, fcl_warn
+from freecad.Robot_tools.App.rbt_helpers_log import (
+    fcl_err, fcl_warn)
 
 
 # helpers
@@ -221,7 +223,6 @@ class DefineTCP:
         pick tool's cad shape. binds pre-selected shape to curr tool fpo
         if no shape selected - import tool from fcstd file
         """
-        from freecad.Robot_tools.App.rbt_tool import has_valid_shape
 
         sel = Gui.Selection.getSelection()
         shape = next((o for o in sel if has_valid_shape(o)), None)

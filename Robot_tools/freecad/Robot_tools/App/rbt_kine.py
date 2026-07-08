@@ -14,9 +14,11 @@ from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
 from freecad.Robot_tools.App.rbt_kine_chain import (
     extract_chain, joint_dirs, doc_limits_deg)
 from freecad.Robot_tools.App.rbt_helpers_math import deg_to_rad, rad_to_deg
+from freecad.Robot_tools.backends import load_kinematics_lib
 from freecad.Robot_tools.backends.base import KinematicsBackend
-from freecad.Robot_tools.App.rbt_constants import DEFAULT_KIN_LIB, PIP_HINTS
-from freecad.Robot_tools.App.rbt_logging import fcl_err, fcl_warn
+from freecad.Robot_tools.App.rbt_global_constants import (
+    DEFAULT_KIN_LIB, PIP_HINTS)
+from freecad.Robot_tools.App.rbt_helpers_log import fcl_err, fcl_warn
 
 Placement: TypeAlias = App.Placement
 Chain: TypeAlias = ChainSpec
@@ -27,27 +29,6 @@ c_pruner = None
 
 # chain cache
 chain_cache: Dict[Tuple[str, str], Chain] = {}
-
-
-# register kinematics backend
-def backend_lib(name: str) -> Type[KinematicsBackend]:
-    if name == "pinocchio":
-        from freecad.Robot_tools.backends.pinocchio import PinocchioBackend
-        return PinocchioBackend
-    elif name == "tesseract":
-        from freecad.Robot_tools.backends.tesseract import TesseractBackend
-        return TesseractBackend
-    elif name == "ikpy":
-        from freecad.Robot_tools.backends.ikpy import IkpyBackend
-        return IkpyBackend
-    elif name == "numpy_dls":
-        from freecad.Robot_tools.backends.numpy_dls import NumpyDLSBackend
-        return NumpyDLSBackend
-
-    # add others
-
-    else:
-        raise ValueError(f"unknown kinematics lib: {name}")
 
 
 def extract_chain_at_zeropos(rbt_obj: "App.DocumentObject"):
@@ -138,7 +119,7 @@ def get_backend(rbt_obj: "App.DocumentObject",
 
     # create new backend instance
     def load_lib(lib_name: str):
-        lib = backend_lib(lib_name)
+        lib = load_kinematics_lib(lib_name)
         be = lib()
         be.load(chain)
         return be

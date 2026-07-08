@@ -20,7 +20,7 @@ from PySide.QtWidgets import (  # noqa
     QGridLayout, QVBoxLayout, QScrollArea)  # Layouts and Policy
 from PySide.QtCore import QObject, Qt  # noqa
 
-from .rbt_constants import ap_clr
+from freecad.Robot_tools.App.rbt_global_constants import ap_clr
 from freecad.Robot_tools import rbt_locator
 
 

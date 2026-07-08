@@ -7,8 +7,8 @@ import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
 
 from pivy import coin  # type: ignore
-from freecad.Robot_tools.App.rbt_logging import fcl_err, fcl_msg
-from freecad.Robot_tools.App.rbt_frames import jog_rotation
+from Robot_tools.freecad.Robot_tools.App.rbt_helpers_log import fcl_err, fcl_msg
+from Robot_tools.freecad.Robot_tools.App.rbt_helpers_frames import jog_rotation
 from freecad.Robot_tools.App.rbt_tool import tool_parent
 from freecad.Robot_tools.Gui.taskpanel_rbt_tool import DefineTCP
 

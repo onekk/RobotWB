@@ -3,9 +3,9 @@
 import FreeCAD as App  # type: ignore
 import UtilsAssembly   # type: ignore
 
-from freecad.Robot_tools.App.rbt_frames import JogFrame, apply_jog_frames
+from Robot_tools.freecad.Robot_tools.App.rbt_helpers_frames import JogFrame, apply_jog_frames
 
-from freecad.Robot_tools.App.rbt_logging import fcl_err
+from Robot_tools.freecad.Robot_tools.App.rbt_helpers_log import fcl_err
 
 TOOL_SCHEMA = [
     ("Tool_shape", "App::PropertyLinkGlobal", "Tool",

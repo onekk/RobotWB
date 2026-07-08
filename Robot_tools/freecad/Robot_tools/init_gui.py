@@ -10,7 +10,7 @@ Licence: LGPL 2.1
 from freecad.Robot_tools.Gui import rbt_commands  # noqa
 
 import FreeCAD as App  # type: ignore
-from freecad.Robot_tools.App.rbt_logging import fcl_msg
+from Robot_tools.freecad.Robot_tools.App.rbt_helpers_log import fcl_msg
 
 tb_pstr = "User parameter:BaseApp/Workbench/Global/Toolbar"
 tb_vers = 1.08

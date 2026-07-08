@@ -1,6 +1,6 @@
 """Robot Constants.
 
-Name: rbt_constants.py
+Name: rbt_global_constants.py
 
 Author: Carlo Dormeletti and Nishendra Singh
 Copyright: 2026

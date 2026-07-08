@@ -31,7 +31,7 @@ from freecad.Robot_tools.App.rbt_kine import (
     save_home, home_q_deg, joint_dirs
 )
 
-from Robot_tools.freecad.Robot_tools.App.rbt_helpers_log import (
+from freecad.Robot_tools.App.rbt_helpers_log import (
     fcl_err, fcl_msg)
 
 V3 = App.Vector

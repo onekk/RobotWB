@@ -20,7 +20,7 @@ from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
 from freecad.Robot_tools.backends.base import (
     placement_to_matrix4, matrix4_to_placement,
 )
-from freecad.Robot_tools.App.rbt_logging import fcl_warn
+from Robot_tools.freecad.Robot_tools.App.rbt_helpers_log import fcl_warn
 
 MM_PER_M = 1000.0
 

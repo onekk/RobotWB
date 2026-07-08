@@ -113,7 +113,7 @@ class RobotCreator:
         if App.GuiUp:
             # ^This is needed to nest the Robot_assembly and Toools
             # under the main FPO tree node
-            from Robot_tools.freecad.Robot_tools.Gui.vp_rbt_robot \
+            from freecad.Robot_tools.Gui.vp_rbt_robot \
                 import ViewProviderRobot
             ViewProviderRobot(fpo.ViewObject)
         fpo.Robot_assembly = asm
