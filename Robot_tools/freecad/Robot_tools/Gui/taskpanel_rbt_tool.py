@@ -4,6 +4,7 @@ import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
 from PySide import QtGui  # type: ignore
 
+from freecad.Robot_tools.App.rbt_robot import is_robot
 from freecad.Robot_tools.App.rbt_tool import (
     Tool, import_shape, has_valid_shape)
 from freecad.Robot_tools.App.rbt_creator_geom import find_center
@@ -310,7 +311,7 @@ def run():
 
 def find_rob():
     sel = Gui.Selection.getSelection()
-    robot = next((o for o in sel if hasattr(o, "Robot_joints")), None)
+    robot = next((o for o in sel if is_robot(o)), None)
     if robot is not None:
         return robot
 
@@ -320,8 +321,7 @@ def find_rob():
     doc = App.ActiveDocument
     if doc is None:
         return None
-    robs = [o for o in doc.Objects
-            if hasattr(o, "Robot_joints")]
+    robs = [o for o in doc.Objects if is_robot(o)]
     if len(robs) < 1:
         return None
     return robs[0]

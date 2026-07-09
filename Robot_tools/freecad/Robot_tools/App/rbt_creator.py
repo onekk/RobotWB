@@ -8,9 +8,13 @@ import UtilsAssembly   # type: ignore
 
 from freecad.Robot_tools.App.rbt_robot import Robot
 from freecad.Robot_tools.App.rbt_creator_asm import (
-    create_assembly, add_asm_object, resolve_asm_ref
+    create_assembly, add_asm_object, resolve_asm_ref,
+    find_assemblies
 )
 from freecad.Robot_tools.App.rbt_creator_jnt import add_joint
+
+from freecad.Robot_tools.App.rbt_global_constants import (
+    GROUNDED_JOINT_NAME, ROBOT_FPO_NAME, ROBOT_ASSEMBLY_LABEL)
 
 
 class RobotCreator:
@@ -51,7 +55,7 @@ class RobotCreator:
     def grounded_joint(self):
         """The assembly's GroundedJoint object, or None."""
         a = self.assembly
-        return a.getObject("GroundedJoint") if a is not None else None
+        return a.getObject(GROUNDED_JOINT_NAME) if a is not None else None
 
     def is_valid_robot(self):
         """
@@ -108,7 +112,7 @@ class RobotCreator:
         """
         self.asm_doc = doc or self.asm_doc or App.ActiveDocument
         asm = create_assembly(self.asm_doc)
-        fpo = self.asm_doc.addObject("App::FeaturePython", "Robot_FPO")
+        fpo = self.asm_doc.addObject("App::FeaturePython", ROBOT_FPO_NAME)
         Robot(fpo)
         if App.GuiUp:
             # ^This is needed to nest the Robot_assembly and Toools
@@ -298,18 +302,8 @@ class RobotCreator:
         return next(
             (
                 asm
-                for asm in self.candidate_assemblies()
+                for asm in find_assemblies(self.asm_doc)
                 if UtilsAssembly.getComponentReference(asm,
                                                        obj, sub)[0] is not None
             ),
             None)
-
-    def candidate_assemblies(self):
-        """
-        Return all Robot_Assembly objects in the working document.
-        """
-        return [
-            asm
-            for asm in self.asm_doc.getObjectsByLabel("Robot_Assembly")
-            if asm.isDerivedFrom("Assembly::AssemblyObject")
-        ]

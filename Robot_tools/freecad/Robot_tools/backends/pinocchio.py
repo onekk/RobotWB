@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional, TypeAlias
 
-import FreeCAD as App
+import FreeCAD as App  # type: ignore
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
+from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
 from freecad.Robot_tools.backends.base import (
     placement_to_matrix4, matrix4_to_placement,
 )
@@ -45,7 +45,7 @@ class PinocchioBackend:
         np = self.np
         M = np.eye(4)
         M[0:3, 0:3] = se3.rotation
-        M[0:3, 3]   = se3.translation
+        M[0:3, 3] = se3.translation
         return matrix4_to_placement(M)
 
     def _signed(self, q_facade: List[float]) -> "np.ndarray":
@@ -72,7 +72,7 @@ class PinocchioBackend:
         pending = App.Placement()
 
         for j in chain.joints:
-            if j.type != "revolute":
+            if j.type != REVOLUTE:
                 pending = pending.multiply(j.parent_to_joint)
                 continue
 
@@ -117,9 +117,10 @@ class PinocchioBackend:
         rot_tol: float = 1e-3,
         max_iter: int = 50,
     ) -> Optional[List[float]]:
-        """Canonical Pinocchio DLS IK (matches examples/inverse-kinematics.py)."""
+        """Canonical Pinocchio DLS IK
+        (matches examples/inverse-kinematics.py)"""
         pin = self.pin
-        np  = self.np
+        np = self.np
         assert self.chain is not None and self.ee_frame_id is not None
         q = self._signed(q_seed_rad)
 
@@ -128,14 +129,15 @@ class PinocchioBackend:
         oMdes = self._pl_to_se3(target_in_base)
 
         damp = 1e-6
-        DT   = 1.0  # step size; with Jlog6 correction we can take full steps
+        DT = 1.0  # step size; with Jlog6 correction we can take full steps
 
         for _ in range(max_iter):
             pin.forwardKinematics(self.model, self.data, q)
             pin.updateFramePlacements(self.model, self.data)
             oMf = self.data.oMf[self.ee_frame_id]
 
-            # Frame error expressed in the FRAME's local coords (canonical form).
+            # Frame error expressed in the FRAME's
+            # local coords (canonical form).
             fMd = oMf.actInv(oMdes)
             err = pin.log6(fMd).vector  # 6-vec twist
 
@@ -146,7 +148,8 @@ class PinocchioBackend:
             J = pin.computeFrameJacobian(
                 self.model, self.data, q,
                 self.ee_frame_id, pin.ReferenceFrame.LOCAL)
-            # Jlog6 correction: turns first-order error into a true Newton step.
+            # Jlog6 correction: turns first-order error into
+            # a true Newton step.
             J = -pin.Jlog6(fMd.inverse()) @ J
 
             v = -J.T @ np.linalg.solve(J @ J.T + (damp ** 2) * np.eye(6), err)
@@ -155,7 +158,7 @@ class PinocchioBackend:
             # Respect limits (clamp on the manifold result)
             k = 0
             for js in self.chain.joints:
-                if js.type != "revolute":
+                if js.type != REVOLUTE:
                     continue
                 q[k] = max(js.lim_low, min(js.lim_high, q[k]))
                 k += 1

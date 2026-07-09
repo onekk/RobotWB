@@ -26,6 +26,8 @@ from freecad.Robot_tools.Gui.rbt_helpers_ui import (
     msg_box
 )
 
+from freecad.Robot_tools.App.rbt_robot import is_robot
+
 from freecad.Robot_tools.App.rbt_kine import (
     joint_limits_q_deg, set_q_deg, current_q_deg,
     save_home, home_q_deg, joint_dirs
@@ -55,7 +57,7 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, low, hi):
     nm = f"{jr:02d}"
 
     # Col 0 : Joint label
-    lbl_jnt = cm_lbl(dlg, f"lbl_jnt{nm}", "Joint{nm}", fnt, 0)
+    lbl_jnt = cm_lbl(dlg, f"lbl_jnt{nm}", f"Joint{nm}", fnt, 0)
     lbl_jnt.setFrameShape(QFrame.Shape.Panel)
     lbl_jnt.setFrameShadow(QFrame.Shadow.Sunken)
     lbl_jnt.setStyleSheet("QLabel {background-color: palette(base);"
@@ -490,7 +492,7 @@ def run():
     fnt = QApplication.font("QMessageBox")
     if len(sel) != 1 \
             or sel[0].TypeId != "App::FeaturePython" \
-            or not sel[0].Name.startswith("Robot_FPO"):
+            or not is_robot(sel[0]):
 
         msg_box(Gui.getMainWindow(), "Robot", fnt,
                 "<b>Robot Selection</b>"
@@ -505,6 +507,7 @@ def run():
                 "<b>Robot Missing Properties</b>"
                 "<br><br>"
                 "You must recreate 'Robot_FPO'")
+        return
 
     # sel[0] contains the robot fpo
     panel = AnimationTaskPanel(sel[0])

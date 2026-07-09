@@ -11,11 +11,13 @@ from PySide.QtWidgets import (  # type: ignore
     QTreeWidgetItem, QHeaderView)
 
 from freecad.Robot_tools.App.rbt_creator import RobotCreator
+from freecad.Robot_tools.App.rbt_creator_asm import find_assemblies
 from freecad.Robot_tools.Gui.rbt_fc_observer import (
     RbtObserver, RbtSelectionObserver)
 from freecad.Robot_tools.App.rbt_helpers_log import fcl_warn
 from freecad.Robot_tools.Gui.rbt_helpers_ui import (
     load_panel_ui, get_file, msg_box, set_txt_color)
+from freecad.Robot_tools.App.rbt_kine_types import REVOLUTE
 
 # --------------------------------------------------------------
 
@@ -94,7 +96,7 @@ class DefineRobot:
             self.install_observer()
             self.curr_step = CreationStep.IMPORT_PARTS
 
-            if self.creator.candidate_assemblies():
+            if find_assemblies(self.creator.asm_doc):
                 # case: reopened existing robot file
                 self.check_asm()
                 self.joint_index = self.creator.next_joint_index()
@@ -124,7 +126,7 @@ class DefineRobot:
         if doc is not None:
             self.creator.asm_doc = doc
             # check if the doc contains is rbt or empty
-            if (self.creator.candidate_assemblies()
+            if (find_assemblies(self.creator.asm_doc)
                     or not doc.Objects):
                 return doc, False
 
@@ -268,7 +270,7 @@ class DefineRobot:
         If multiple assms are open, ask the user to select
         the correct one
         """
-        cands = self.creator.candidate_assemblies()
+        cands = find_assemblies(self.creator.asm_doc)
         if not cands:
             msg_box(self.form, " ", self.form.font(),
                     "No robot assembly in document.")
@@ -425,7 +427,7 @@ class DefineRobot:
             # add revolute joint
             refs = [(faces[0]["obj"], faces[0]["ref"]),
                     (faces[1]["obj"], faces[1]["ref"])]
-            self.creator.insert_joint("revolute",
+            self.creator.insert_joint(REVOLUTE,
                                       refs,
                                       label=f"rb_jnt{self.joint_index:02d}")
             self.joint_index += 1
@@ -603,7 +605,7 @@ class DefineRobot:
                             or o.isDerivedFrom("App::Part")
                             for o in self.doc.Objects)
             return (bool(self.imported_names) or has_parts or
-                    bool(self.creator.candidate_assemblies()))
+                    bool(find_assemblies(self.creator.asm_doc)))
 
         if step == CreationStep.CREATE_ASSEMBLY:
             return (self.creator.assembly is not None and

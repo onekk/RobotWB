@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple, TypeAlias
 
 import FreeCAD as App  # type: ignore
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
+from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
 from freecad.Robot_tools.App.rbt_kine_chain import (
     extract_chain, joint_dirs, doc_limits_deg)
 from freecad.Robot_tools.App.rbt_helpers_math import deg_to_rad, rad_to_deg
@@ -251,7 +251,7 @@ def apply_joint_angles(rbt_obj, q_deg):
         # forward pass transpose
         F = F.multiply(joint.parent_to_joint)
 
-        if joint.type == "revolute":
+        if joint.type == REVOLUTE:
             F = F.multiply(App.Placement(App.Vector(),
                                          App.Rotation(joint.axis, q_deg[i])))
 
@@ -295,7 +295,7 @@ def dof_mask(rbt_obj) -> List[bool]:
     true for joints that add a DOF to the chain
     only true for revolute joints for now
     """
-    return [j.type == "revolute"
+    return [j.type == REVOLUTE
             for j in get_chain(rbt_obj).joints]
 
 

@@ -15,7 +15,7 @@ from typing import List, Optional, TypeAlias
 import numpy as np  # type: ignore
 import FreeCAD as App  # type: ignore
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
+from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
 from freecad.Robot_tools.backends.base import (
     placement_to_matrix4, matrix4_to_placement,
 )
@@ -58,7 +58,7 @@ class NumpyDLSBackend:
         self._steps = []
         for j in chain.joints:
             A = placement_to_matrix4(j.parent_to_joint)
-            if j.type == "revolute":
+            if j.type == REVOLUTE:
                 ax = np.array([j.axis.x, j.axis.y, j.axis.z], dtype=float)
                 n = np.linalg.norm(ax)
                 if n < 1e-10:

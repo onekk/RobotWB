@@ -13,20 +13,21 @@ from xml.sax.saxutils import quoteattr
 import numpy as np
 from FreeCAD import Placement, Rotation, Vector
 
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.tesseract_common import ( # type: ignore
     FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     Translation3d,
     Quaterniond,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import (
+from tesseract_robotics.tesseract_environment import (   # type: ignore
+    Environment)
+from tesseract_robotics.tesseract_kinematics import (  # type: ignore
     KinGroupIKInput,
     KinGroupIKInputs,
 )
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
+from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
 from freecad.Robot_tools.App.rbt_helpers_log import fcl_warn
 
 
@@ -211,7 +212,7 @@ def _chain_to_urdf_string(chain: ChainSpec, base_link: str) -> str:
         T = j.parent_to_joint
         xyz = (T.Base.x / MM_PER_M, T.Base.y / MM_PER_M, T.Base.z / MM_PER_M)
         rpy = _placement_to_rpy(T)
-        jtype = "revolute" if j.type == "revolute" else "fixed"
+        jtype = "revolute" if j.type == REVOLUTE else "fixed"
 
         j_str = f'  <joint name={quoteattr(j.name)} type={quoteattr(jtype)}>\n'
         l_str = f'    <parent link={quoteattr(parent_name)}/>\n'
@@ -225,10 +226,8 @@ def _chain_to_urdf_string(chain: ChainSpec, base_link: str) -> str:
         )
         if jtype == "revolute":
             ax = j.axis
-            a_str = f'<axis xyz="{
-                    float(ax.x):.9g} {
-                        float(ax.y):.9g} {
-                            float(ax.z):.9g}"/>\n'
+            x, y, z = float(ax.x), float(ax.y), float(ax.z)
+            a_str = f'<axis xyz="{x:.9g} {y:.9g} {z:.9g}"/>\n'
             buf.write(a_str)
             buf.write(
                 f'    <limit lower="{j.lim_low:.9g}" upper="{j.lim_high:.9g}" '

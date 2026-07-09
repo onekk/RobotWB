@@ -14,7 +14,7 @@ import FreeCAD as App  # type: ignore
 import UtilsAssembly  # type: ignore
 
 from freecad.Robot_tools.App.rbt_kine_types import (
-    ChainSpec, JointSpec, LinkSpec
+    ChainSpec, JointSpec, LinkSpec, joint_type_FC2WB
 )
 from freecad.Robot_tools.App.rbt_helpers_math import deg_to_rad
 from freecad.Robot_tools.App.rbt_helpers_log import fcl_err
@@ -90,7 +90,7 @@ def extract_chain(robot_obj: "App.DocumentObject") -> Optional[ChainSpec]:
 
         joints.append(JointSpec(
             name=j.Label or f"joint{idx:02d}",
-            type="revolute" if j.JointType == "Revolute" else "fixed",
+            type=joint_type_FC2WB(j.JointType),
             parent_to_joint=parent_to_joint,
             axis=axis,
             lim_low=deg_to_rad(low),

@@ -16,6 +16,26 @@ Placement: TypeAlias = App.Placement
 JointType: TypeAlias = Literal["revolute", "prismatic", "fixed"]
 # --------------------
 
+# Supported Joints
+REVOLUTE: JointType = "revolute"
+PRISMATIC: JointType = "prismatic"
+FIXED: JointType = "fixed"
+
+# map name to Assembly JointType index
+JOINT_TYPES = {REVOLUTE: 1}
+
+
+def joint_type_FC2WB(fc_jnt_name: str) -> JointType:
+    """
+        Map Freecad assembly wb joint type string 
+        to the joint string names used in robot WB
+    """
+    if fc_jnt_name == "Revolute":
+        return REVOLUTE
+    else:
+        return FIXED
+
+
 # --------------------
 #    chain spec
 # --------------------

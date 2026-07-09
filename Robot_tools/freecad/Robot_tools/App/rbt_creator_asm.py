@@ -6,10 +6,14 @@ Builds the Robot_Assembly & links part instances to it
 import FreeCAD as App  # type: ignore
 import UtilsAssembly   # type: ignore
 
+from freecad.Robot_tools.App.rbt_global_constants import (
+    ROBOT_ASSEMBLY_LABEL, ROBOT_FPO_NAME, GROUNDED_JOINT_NAME
+)
+
 
 def create_assembly(doc):
     asm = doc.addObject("Assembly::AssemblyObject", "Assembly")
-    asm.Label = "Robot_Assembly"
+    asm.Label = ROBOT_ASSEMBLY_LABEL
     asm.Type = "Assembly"
     asm.newObject("Assembly::JointGroup", "Joints")
     asm.recompute()
@@ -36,7 +40,7 @@ def add_asm_object(obj_doc, asm, feat_nm, link_nm, glbl):
 def resolve_asm_ref(asm_doc):
     """Resolve the robot assembly for the given document."""
 
-    fpos = asm_doc.getObjectsByLabel("Robot_FPO")
+    fpos = asm_doc.getObjectsByLabel(ROBOT_FPO_NAME)
     fpo = fpos[0] if len(fpos) == 1 else None
 
     # try preferred sources
@@ -51,10 +55,7 @@ def resolve_asm_ref(asm_doc):
             return asm, fpo, source
 
     # fallback: search by label
-    objs = [
-        obj for obj in asm_doc.getObjectsByLabel("Robot_Assembly")
-        if obj.isDerivedFrom("Assembly::AssemblyObject")
-    ]
+    objs = find_assemblies(asm_doc)
 
     # unique match only
     if len(objs) == 1:
@@ -62,3 +63,12 @@ def resolve_asm_ref(asm_doc):
 
     # nothing found
     return None, fpo, "none"
+
+
+def find_assemblies(doc):
+    """
+    All Robot_Assembly objects in doc
+    """
+    return [obj for obj in
+            doc.getObjectsByLabel(ROBOT_ASSEMBLY_LABEL)
+            if obj.isDerivedFrom("Assembly::AssemblyObject")]

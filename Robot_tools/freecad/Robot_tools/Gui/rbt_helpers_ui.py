@@ -12,13 +12,13 @@ Licence: LGPL 2.1
 import os
 import FreeCADGui as Gui  # type: ignore
 
-from PySide.QtWidgets import (  # noqa
+from PySide.QtWidgets import (  # noqa # type: ignore
     QCheckBox,  QFrame, QGroupBox, QLabel,
     QDoubleSpinBox, QSlider, QToolButton,
     QPushButton,
     QFileDialog, QMessageBox,  # Dialogs
     QGridLayout, QVBoxLayout, QScrollArea)  # Layouts and Policy
-from PySide.QtCore import QObject, Qt  # noqa
+from PySide.QtCore import QObject, Qt  # type: ignore # noqa
 
 from freecad.Robot_tools.App.rbt_global_constants import ap_clr
 from freecad.Robot_tools import rbt_locator

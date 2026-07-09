@@ -7,9 +7,8 @@ import JointObject   # type: ignore
 import UtilsAssembly  # type: ignore
 
 from freecad.Robot_tools.App.rbt_creator_geom import find_center
-
-# map name to Assembly JointType index
-JOINT_TYPES = {"revolute": 1}
+from freecad.Robot_tools.App.rbt_kine_types import JOINT_TYPES
+from freecad.Robot_tools.App.rbt_global_constants import GROUNDED_JOINT_NAME
 
 
 def add_joint(asm, jtype, refs, label=""):
@@ -20,7 +19,7 @@ def add_joint(asm, jtype, refs, label=""):
     """
     jg = UtilsAssembly.getJointGroup(asm)
     if jtype == "grounded":
-        j = jg.newObject("App::FeaturePython", "GroundedJoint")
+        j = jg.newObject("App::FeaturePython", GROUNDED_JOINT_NAME)
         JointObject.GroundedJoint(j, refs[0][0])
         JointObject.ViewProviderGroundedJoint(j.ViewObject)
         asm.Document.recompute()

@@ -12,6 +12,8 @@ import FreeCADGui as Gui  # type: ignore
 # service import
 from freecad.Robot_tools import rbt_locator
 
+from freecad.Robot_tools.App.rbt_robot import is_robot
+
 wb_path = os.path.dirname(rbt_locator.__file__)
 
 
@@ -70,8 +72,7 @@ class CommandCreateTool:
 
     def IsActive(self):
         doc = App.ActiveDocument
-        return bool(doc) and any(hasattr(o, "Robot_joints")
-                                 for o in doc.Objects)
+        return bool(doc) and any(is_robot(o) for o in doc.Objects)
 
     def Activated(self):
         from freecad.Robot_tools.Gui import taskpanel_rbt_tool

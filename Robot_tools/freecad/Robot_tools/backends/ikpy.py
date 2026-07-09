@@ -16,11 +16,11 @@ import FreeCAD as App  # type: ignore
 import ikpy.chain as _ik_chain  # type: ignore
 import ikpy.link as _ik_link  # type: ignore
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec
+from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
 from freecad.Robot_tools.backends.base import (
     placement_to_matrix4, matrix4_to_placement,
 )
-from Robot_tools.freecad.Robot_tools.App.rbt_helpers_log import fcl_warn
+from freecad.Robot_tools.App.rbt_helpers_log import fcl_warn
 
 MM_PER_M = 1000.0
 
@@ -68,7 +68,7 @@ class IkpyBackend:
 
         # convert from FreeCAD to IKPY link notation
         for j in chain.joints:
-            if j.type != "revolute":
+            if j.type != REVOLUTE:
                 # Treat fixed joints as fixed URDFLinks (no rotation axis).
                 links.append(_ik_link.URDFLink(
                     name=j.name,

@@ -44,7 +44,6 @@ ROBOT_SCHEMA = [
 #                   Robot Objects
 # ------------------------------------------------
 
-
 class Robot:
     def __init__(self, obj):
         '''Add some custom properties to our box feature'''
@@ -101,3 +100,15 @@ class Robot:
     def execute(self, obj):
         '''Do something when doing a recomputation, this method is mandatory'''
         pass
+
+
+# --------------------------------
+#         HELPERS
+# --------------------------------
+
+def is_robot(obj) -> bool:
+    """
+    True if an obj is of type Robot FPO
+    """
+    return (hasattr(obj, "Robot_joints") and
+            hasattr(obj, "Robot_assembly"))
