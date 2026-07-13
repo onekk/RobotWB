@@ -3,7 +3,7 @@
 Pure-Python FK/IK using `ikpy`. Builds the chain programmatically from
 ChainSpec — no URDF round-trip. Matches the KinematicsBackend Protocol
 and mirrors the Pinocchio backend's coordinate conventions
-(base_world pre/post-multiplication, flange_local at the tip).
+(base_in_asm pre/post-multiplication, flange_local at the tip).
 """
 
 from __future__ import annotations
@@ -16,7 +16,8 @@ import FreeCAD as App  # type: ignore
 import ikpy.chain as _ik_chain  # type: ignore
 import ikpy.link as _ik_link  # type: ignore
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
+from freecad.Robot_tools.App.rbt_kine_types import (
+    ChainSpec, REVOLUTE, PRISMATIC, FIXED)
 from freecad.Robot_tools.backends.base import (
     placement_to_matrix4, matrix4_to_placement,
 )
@@ -68,7 +69,7 @@ class IkpyBackend:
 
         # convert from FreeCAD to IKPY link notation
         for j in chain.joints:
-            if j.type != REVOLUTE:
+            if j.type == FIXED:
                 # Treat fixed joints as fixed URDFLinks (no rotation axis).
                 links.append(_ik_link.URDFLink(
                     name=j.name,
@@ -80,15 +81,29 @@ class IkpyBackend:
                 mask.append(False)  # mark this joint as inactive
                 continue
 
-            links.append(_ik_link.URDFLink(
-                name=j.name,
-                origin_translation=_pl_translation_m(j.parent_to_joint),
-                origin_orientation=_pl_rpy(j.parent_to_joint),
-                rotation=[float(j.axis.x), float(j.axis.y), float(j.axis.z)],
-                bounds=(float(j.lim_low), float(j.lim_high)),
-                joint_type="revolute",
-            ))
-            mask.append(True)
+            elif j.type == PRISMATIC:
+                links.append(_ik_link.URDFLink(
+                    name=j.name,
+                    origin_translation=_pl_translation_m(j.parent_to_joint),
+                    origin_orientation=_pl_rpy(j.parent_to_joint),
+                    rotation=None,
+                    translation=[float(j.axis.x), float(j.axis.y),
+                                 float(j.axis.z)],
+                    bounds=(float(j.lim_low), float(j.lim_high)),
+                    joint_type="prismatic",
+                ))
+                mask.append(True)
+
+            elif j.type == REVOLUTE:
+                links.append(_ik_link.URDFLink(
+                    name=j.name,
+                    origin_translation=_pl_translation_m(j.parent_to_joint),
+                    origin_orientation=_pl_rpy(j.parent_to_joint),
+                    rotation=[float(j.axis.x), float(j.axis.y), float(j.axis.z)],
+                    bounds=(float(j.lim_low), float(j.lim_high)),
+                    joint_type="revolute",
+                ))
+                mask.append(True)
 
         # Append the flange as a fixed link past the last joint.
         F = chain.flange_local
@@ -117,7 +132,7 @@ class IkpyBackend:
         q_full = self._expand(q_rad)
         T_m = self._ikc.forward_kinematics(q_full)   # 4x4 in base-local meters
         flange_in_base = matrix4_to_placement(T_m)
-        return self._chain.base_world.multiply(flange_in_base)
+        return self._chain.base_in_asm.multiply(flange_in_base)
 
     def ik(
         self,
@@ -129,7 +144,7 @@ class IkpyBackend:
     ) -> Optional[List[float]]:
 
         assert self._chain is not None and self._ikc is not None
-        target_in_base = self._chain.base_world.inverse().multiply(target)
+        target_in_base = self._chain.base_in_asm.inverse().multiply(target)
         T_m = placement_to_matrix4(target_in_base)
         target_pos = T_m[0:3, 3]
         target_rot = T_m[0:3, 0:3]

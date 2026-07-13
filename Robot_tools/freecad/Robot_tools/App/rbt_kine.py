@@ -10,12 +10,15 @@ from typing import Dict, List, Optional, Tuple, TypeAlias
 
 import FreeCAD as App  # type: ignore
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
+from freecad.Robot_tools.App.rbt_kine_types import (
+    ChainSpec, joint_type_FC2WB, REVOLUTE, PRISMATIC, FIXED)
 from freecad.Robot_tools.App.rbt_kine_chain import (
-    extract_chain, joint_dirs, doc_limits_deg)
-from freecad.Robot_tools.App.rbt_helpers_math import deg_to_rad, rad_to_deg
+    extract_chain, joint_dirs, joint_limits_doc,
+    joint_value_doc, q_doc_to_si, q_si_to_doc)
+from freecad.Robot_tools.App.rbt_helpers_math import deg_to_rad
 from freecad.Robot_tools.backends import load_kinematics_lib
 from freecad.Robot_tools.backends.base import KinematicsBackend
+from freecad.Robot_tools.App.rbt_placement import p_asm_in_world
 from freecad.Robot_tools.App.rbt_global_constants import (
     DEFAULT_KIN_LIB, PIP_HINTS)
 from freecad.Robot_tools.App.rbt_helpers_log import fcl_err, fcl_warn
@@ -29,32 +32,6 @@ c_pruner = None
 
 # chain cache
 chain_cache: Dict[Tuple[str, str], Chain] = {}
-
-
-def extract_chain_at_zeropos(rbt_obj: "App.DocumentObject"):
-    """
-        Run extract_chain with every joint forced to q=0
-    """
-    joints = list(rbt_obj.Robot_joints or [])
-    saved = [App.Placement(j.Offset2) for j in joints]  # cache for reset
-    try:
-        for j in joints:
-            j.Offset2 = App.Placement()  # set q=0
-
-        recompute_asm(rbt_obj)
-        recompute_tool(rbt_obj)
-
-        return extract_chain(rbt_obj)
-
-    except Exception as e:
-        fcl_err(f"Unable to set robot to neutral Q=0 pos: {e}")
-
-    finally:
-        for j, plc in zip(joints, saved):
-            j.Offset2 = plc  # reset back to original vals
-
-        recompute_asm(rbt_obj)
-        recompute_tool(rbt_obj)
 
 
 def recompute_asm(rbt_obj: "App.DocumentObject") -> None:
@@ -76,13 +53,12 @@ def recompute_tool(rbt_obj: "App.DocumentObject") -> None:
         Recomputes tool object
     """
     tool = getattr(rbt_obj, "Active_tool", None)
-    if tool is not None:
-        try:
-            tool.recompute()
-        except Exception as e:
-            fcl_err(f"Unable to recompute tool: {e}")
-    else:
-        fcl_err("Unable to find attr <Active_tool>")
+    if tool is None:
+        return
+    try:
+        tool.recompute()
+    except Exception as e:
+        fcl_err(f"Unable to recompute tool: {e}")
 
 
 def backend_name(rbt_obj: "App.DocumentObject") -> str:
@@ -111,8 +87,9 @@ def get_backend(rbt_obj: "App.DocumentObject",
 
     # if no cached BE exists, init new instance & cache it
 
-    # extract robot kinematic chain at all neutral angles (q=0)
-    chain = extract_chain_at_zeropos(rbt_obj)
+    # extract robot kinematic chain after refreshing tcp
+    recompute_tool(rbt_obj)
+    chain = extract_chain(rbt_obj)
     if chain is None:
         fcl_err("Cant extract robot kinematics info")
         return None
@@ -170,59 +147,44 @@ def invalidate(rbt_obj: "App.DocumentObject") -> None:
         fcl_err(traceback.format_exc())
 
 
-def current_q_deg(rbt_obj: "App.DocumentObject") -> List[float]:
+def curr_joint_vals_doc(rbt_obj: "App.DocumentObject") -> List[float]:
     """
-        Canonical URDF style joint angles
-        q = direction * FC Offset2 based yaw
+        joint values in doc units
+        q = dir * Offset2 (yaw deg | z mm)
     """
-    out: List[float] = []
-    for d, j in zip(joint_dirs(rbt_obj), rbt_obj.Robot_joints):
-        # offset2 has curr rotation. Z component is what
-        # AnimationController writes via Rotation(angle, 0, 0)
-        # toEuler() returns (yaw, pitch, roll) in deg
-        # TODO: FIX toEuler warp angles to +-180deg
-        yaw, _, _ = j.Offset2.Rotation.toEuler()
-        out.append(d * float(yaw))
-    return out
-
-
-def set_q_deg(rbt_obj, j_idx: int, q: float) -> None:
-    """
-    canonical urdf style angle q
-    fc's yaw = dir * q
-    or canonical q = dir * yaw
-    As dir is +-1, above equations are same
-    """
-    d = joint_dirs(rbt_obj)[j_idx]
-    joint = rbt_obj.Robot_joints[j_idx]
-    joint.Offset2 = App.Placement(App.Vector(),
-                                  App.Rotation(d*q, 0, 0))
-    joint.recompute()
-    tool = getattr(rbt_obj, "Active_tool", None)
-    if tool:
-        tool.recompute()
+    return [joint_value_doc(j, d)
+            for d, j in zip(joint_dirs(rbt_obj), rbt_obj.Robot_joints)]
 
 
 def joint_limits_q_deg(rbt_obj, j_idx: int):
     """
     q-space limits, considering direction into account
     """
-    low, high = doc_limits_deg(rbt_obj.Robot_joints[j_idx])
+    low, high = joint_limits_doc(rbt_obj.Robot_joints[j_idx])
     if joint_dirs(rbt_obj)[j_idx] == -1:
         low, high = -high, -low
     return low, high
 
 
+def jog_q_deg(rbt_obj, q_deg):
+    """continuous jog: FK only"""
+    apply_joint_angles(rbt_obj, q_deg)
+    tool = getattr(rbt_obj, "Active_tool", None)
+    if tool:
+        tool.recompute()
+
+
 def save_home(rbt_obj) -> None:
     """Robot_home_pos in FC yaw convention"""
-    rbt_obj.Robot_home_pos = [float(j.Offset2.Rotation.toEuler()[0])
+    rbt_obj.Robot_home_pos = [joint_value_doc(j, 1)
                               for j in rbt_obj.Robot_joints]
 
 
 def home_q_deg(rbt_obj) -> List[float]:
     """q_home = dir * stored yaw home pos"""
-    return [d * float(y) for d, y in zip(joint_dirs(rbt_obj),
-                                         rbt_obj.Robot_home_pos or [])]
+    home = list(rbt_obj.Robot_home_pos or [])
+    home += [0.0] * (len(rbt_obj.Robot_joints) - len(home))
+    return [d * float(y) for d, y in zip(joint_dirs(rbt_obj), home)]
 
 
 def get_chain(rbt_obj):
@@ -244,9 +206,12 @@ def apply_joint_angles(rbt_obj, q_deg):
     chain = get_chain(rbt_obj)
     if chain is None:
         return
+    if len(q_deg) != len(chain.joints):
+        fcl_err("joints lengths does not match with kin chain length")
+        return
 
     doc = rbt_obj.Document
-    F = App.Placement(chain.base_world)
+    F = App.Placement(chain.base_in_asm)
     for i, joint in enumerate(chain.joints):
         # forward pass transpose
         F = F.multiply(joint.parent_to_joint)
@@ -254,6 +219,10 @@ def apply_joint_angles(rbt_obj, q_deg):
         if joint.type == REVOLUTE:
             F = F.multiply(App.Placement(App.Vector(),
                                          App.Rotation(joint.axis, q_deg[i])))
+
+        elif joint.type == PRISMATIC:
+            F = F.multiply(App.Placement(joint.axis * q_deg[i],
+                                         App.Rotation()))
 
         # apply joint to part offset
         part = doc.getObject(chain.links[i+1].name)
@@ -265,7 +234,9 @@ def apply_joint_angles(rbt_obj, q_deg):
 
     tool = getattr(rbt_obj, "Active_tool", None)
     if tool is not None:
-        tool.TCP_placement = F.multiply(chain.flange_local)
+        tool.TCP_placement = (p_asm_in_world(rbt_obj)
+                              .multiply(F)
+                              .multiply(chain.flange_local))
         # tool.recompute()
 
 
@@ -275,14 +246,22 @@ def resolve_offsets(rbt_obj, q_deg):
     """
     if q_deg is None:
         return
+    apply_joint_angles(rbt_obj, q_deg)
     prefs = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Assembly")
     prev = prefs.GetBool("SolveInJointCreation", True)
     prefs.SetBool("SolveInJointCreation", False)  # avoid calculation at start
     try:
         dirs = joint_dirs(rbt_obj)
         for i, joint in enumerate(rbt_obj.Robot_joints):
-            joint.Offset2 = App.Placement(App.Vector(),
-                                          App.Rotation(dirs[i]*q_deg[i], 0, 0))
+            jt = joint_type_FC2WB(joint.JointType)
+            off = dirs[i]*q_deg[i]
+            if jt == REVOLUTE:
+                joint.Offset2 = App.Placement(joint.Offset2.Base,
+                                              App.Rotation(off, 0, 0))
+            elif jt == PRISMATIC:
+                b = joint.Offset2.Base
+                joint.Offset2 = App.Placement(App.Vector(b.x, b.y, off),
+                                              joint.Offset2.Rotation)
     finally:
         prefs.SetBool("SolveInJointCreation", prev)  # reset to original val
 
@@ -293,10 +272,17 @@ def resolve_offsets(rbt_obj, q_deg):
 def dof_mask(rbt_obj) -> List[bool]:
     """
     true for joints that add a DOF to the chain
-    only true for revolute joints for now
     """
-    return [j.type == REVOLUTE
+    return [j.type != FIXED
             for j in get_chain(rbt_obj).joints]
+
+
+def dof_types(rbt_obj) -> List[str]:
+    """
+    Joint types of the active dof joints (compressed chain)
+    """
+    kin_chain = get_chain(rbt_obj).joints
+    return [j.type for j in kin_chain if j.type != FIXED]
 
 
 def compress_chain(vals, mask):
@@ -332,13 +318,17 @@ def fk(
     if be is None:
         return None
     if q_deg is None:
-        q_deg = current_q_deg(rbt_obj)
+        q_deg = curr_joint_vals_doc(rbt_obj)
 
-    mask: List[bool] = dof_mask(rbt_obj)
-    q_rad: List[float] = [deg_to_rad(v)
-                          for v in compress_chain(q_deg, mask)]
+    mask = dof_mask(rbt_obj)
+    types = dof_types(rbt_obj)
+    c_chain = compress_chain(q_deg, mask)
+    q_si: List[float] = [q_doc_to_si(t, v)
+                         for t, v in
+                         zip(types, c_chain)]
     try:
-        return be.fk(q_rad)
+        # return fk in world-frame
+        return p_asm_in_world(rbt_obj).multiply(be.fk(q_si))
     except Exception as e:
         fcl_err(f"FK failed: {e}")
         return None
@@ -368,17 +358,23 @@ def ik(
     # take last valid joint angles or current angles when
     # no initial values are provided in input
     if q_seed_deg is None:
-        q_seed_deg = current_q_deg(rbt_obj)
+        q_seed_deg = curr_joint_vals_doc(rbt_obj)
 
     # filter out fixed/active joints & convert deg -> rad
     mask = dof_mask(rbt_obj)
-    q_seed_rad: List[float] = [deg_to_rad(v)
-                               for v in compress_chain(q_seed_deg, mask)]
+    types = dof_types(rbt_obj)
+    c_chain = compress_chain(q_seed_deg, mask)
+    q_seed_rad: List[float] = [q_doc_to_si(t, v)
+                               for t, v in
+                               zip(types, c_chain)]
 
     # ik pass
     try:
+        target_in_asm = (p_asm_in_world(rbt_obj)
+                         .inverse()
+                         .multiply(target))
         q_rad: Optional[List[float]] = be.ik(
-            target, q_seed_rad,
+            target_in_asm, q_seed_rad,
             pos_tol=pos_tol_mm / 1000.0,
             rot_tol=deg_to_rad(rot_tol_deg),
         )
@@ -389,7 +385,9 @@ def ik(
         return None
 
     # apply back the fixed joints & convert back rad -> deg
-    q_deg: List[float] = expand_chain([rad_to_deg(v) for v in q_rad],
+    q_deg: List[float] = expand_chain([q_si_to_doc(t, v)
+                                       for t, v in
+                                       zip(types, q_rad)],
                                       mask, q_seed_deg)
 
     return q_deg

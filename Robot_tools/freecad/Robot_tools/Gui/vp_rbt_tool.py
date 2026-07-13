@@ -286,7 +286,7 @@ class ViewProviderTool:
                 self._active_axis = DragMode.FREE
                 self._drag_axis_dir = None
 
-        self._q_seed = rbt_kine.current_q_deg(self.robot)
+        self._q_seed = rbt_kine.curr_joint_vals_doc(self.robot)
 
     def _on_drag_motion(self, userdata, event_cb):
         if self.drag_start_tcp is None:

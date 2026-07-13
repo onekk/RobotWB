@@ -5,8 +5,12 @@ Geometric helpers for new robot creation & joint placements
 import math
 import UtilsAssembly  # type: ignore
 
+from freecad.Robot_tools.App.rbt_kine_types import REVOLUTE
+from freecad.Robot_tools.App.rbt_global_constants import BASE_FRAME_NAME
 
-def find_center(obj, sub):
+
+
+def find_center(obj, sub, jtype=REVOLUTE):
     """Find center for the mating or flange faces."""
     # TODO: Find center for revolute joint creation more
     # accurately. The edge based selection is more accurate
@@ -16,8 +20,9 @@ def find_center(obj, sub):
     ref = [obj, [sub, sub]]
     elt = UtilsAssembly.getElementName(sub)
 
+    # only revolute face picks require circular-edge center
     # pass vertex or edge-picks as it is
-    if not elt.startswith("Face"):
+    if jtype != REVOLUTE or not elt.startswith("Face"):
         return ref
 
     o = UtilsAssembly.getObject(ref)
@@ -81,3 +86,31 @@ def dominant_circular_edge(face):
             return None
 
     return idx
+
+
+def add_frame(container, ref, name):
+    """
+    editable Local Coordinate System (LCS) in
+    'container', placed at the picked item's default
+    JCS origin given by freeCAD
+    """
+    if isinstance(ref[1], str):
+        # raw pick (obj, "FaceN") -> UtilsAssembly ref format
+        ref = [ref[0], [ref[1], ref[1]]]
+    pick_jcs = UtilsAssembly.findPlacement(ref)  # raw value without offsets
+    jcs_in_world = UtilsAssembly.getGlobalPlacement(ref).multiply(pick_jcs)
+
+    lcs = container.newObject("App::LocalCoordinateSystem", name)
+    # bare App datum crashes Assembly's getGroundedParts
+    # MapMode defaults to "Deactivated" → treated as grounded
+    lcs.addExtension("Part::AttachExtensionPython")
+    lcs.Placement = (container.getGlobalPlacement().inverse()
+                     .multiply(jcs_in_world))
+    return lcs
+
+
+def add_base_frame(asm, ref):
+    """
+    base frame for the robot assembly
+    """
+    return add_frame(asm, ref, BASE_FRAME_NAME)

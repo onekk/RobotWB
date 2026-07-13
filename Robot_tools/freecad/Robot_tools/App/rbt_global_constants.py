@@ -13,6 +13,10 @@ Licence: LGPL 2.1
 ROBOT_FPO_NAME = "Robot_FPO"
 ROBOT_ASSEMBLY_LABEL = "Robot_Assembly"
 GROUNDED_JOINT_NAME = "GroundedJoint"
+BASE_FRAME_NAME = "BaseFrame"
+
+MM_PER_M = 1000.0
+DEFAULT_SLIDER_TRAVEL_MM = 500
 
 ap_clr = {
     "Black": [(0.0, 0.0, 0.0), "#000000"],

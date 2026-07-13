@@ -7,14 +7,13 @@ import UtilsAssembly   # type: ignore
 
 
 from freecad.Robot_tools.App.rbt_robot import Robot
+from freecad.Robot_tools.App.rbt_creator_geom import add_base_frame
 from freecad.Robot_tools.App.rbt_creator_asm import (
     create_assembly, add_asm_object, resolve_asm_ref,
-    find_assemblies
-)
+    find_assemblies)
 from freecad.Robot_tools.App.rbt_creator_jnt import add_joint
-
 from freecad.Robot_tools.App.rbt_global_constants import (
-    GROUNDED_JOINT_NAME, ROBOT_FPO_NAME, ROBOT_ASSEMBLY_LABEL)
+    ROBOT_FPO_NAME, BASE_FRAME_NAME)
 
 
 class RobotCreator:
@@ -54,8 +53,13 @@ class RobotCreator:
 
     def grounded_joint(self):
         """The assembly's GroundedJoint object, or None."""
-        a = self.assembly
-        return a.getObject(GROUNDED_JOINT_NAME) if a is not None else None
+        from freecad.Robot_tools.App.rbt_placement import find_grounded_joint
+        return find_grounded_joint(self.assembly)
+
+    def has_grounded_datum(self):
+        from freecad.Robot_tools.App.rbt_placement import (
+            is_grounded_datum, chain_root)
+        return is_grounded_datum(chain_root(self.fpo), self.assembly)
 
     def is_valid_robot(self):
         """
@@ -66,8 +70,12 @@ class RobotCreator:
         if a is None or f is None:
             return False
 
-        return self.grounded_joint() is not None and \
-            len(f.Robot_joints) >= 1
+        has_base_ref = (self.grounded_joint() is not None
+                        or self.has_grounded_datum())
+
+        has_enough_joints = len(f.Robot_joints) >= 1
+
+        return (has_base_ref and has_enough_joints)
 
     def bind(self, asm):
         """
@@ -125,6 +133,15 @@ class RobotCreator:
         self.bind(asm)
         return asm
 
+    def insert_base(self, jtype, pick, label=""):
+        """
+        BaseFrame + joint 0 of type 'jtype' into
+        the user picked selection
+        """
+        lcs = add_base_frame(self.assembly, pick)
+        z_axis = next(f for f in lcs.OriginFeatures if f.Role == "Z_Axis")
+        return self.insert_joint(jtype, [(lcs, z_axis.Name+"."), pick], label)
+
     def insert_joint(self, jtype, refs, label=""):
         """
         Creates and adds joint of the type 'jtype'
@@ -159,25 +176,34 @@ class RobotCreator:
             rbt_kine.invalidate(self.fpo)
 
     def delete_joint(self, obj, grounded=False):
-        """
-        Removes an existing joint & keeps sync
-        of robot joints and their directions
-        """
+        """Remove a joint and keep robot joints/directions in sync."""
         doc = self.assembly.Document
-        if not grounded and \
-                self.fpo is not None and \
-                obj in self.fpo.Robot_joints:
 
-            # read the index of the joint before removal
-            idx = list(self.fpo.Robot_joints).index(obj)
+        if not grounded and self.fpo and obj in self.fpo.Robot_joints:
             joints = list(self.fpo.Robot_joints)
             dirs = list(self.fpo.Robot_joints_dir)
+
+            idx = joints.index(obj)
             joints.pop(idx)
             if idx < len(dirs):
                 dirs.pop(idx)
+
             self.fpo.Robot_joints = joints
             self.fpo.Robot_joints_dir = dirs
+
+        # read frame before the joint deletion
+        refs = getattr(obj, "Reference1", None)
+        root = refs[0] if refs else None
+
         doc.removeObject(obj.Name)
+
+        if root and BASE_FRAME_NAME in root.Name:
+            joints = self.fpo.Robot_joints if self.fpo else ()
+            if not any(j.Reference1
+                       and j.Reference1[0] is root
+                       for j in joints):
+                doc.removeObject(root.Name)
+
         doc.recompute()
 
     def stack_translation(self, link, screen_center, screen_corner):

@@ -3,11 +3,10 @@ Assembly document handling for creation of new robot
 Builds the Robot_Assembly & links part instances to it
 """
 
-import FreeCAD as App  # type: ignore
 import UtilsAssembly   # type: ignore
 
 from freecad.Robot_tools.App.rbt_global_constants import (
-    ROBOT_ASSEMBLY_LABEL, ROBOT_FPO_NAME, GROUNDED_JOINT_NAME
+    ROBOT_ASSEMBLY_LABEL, ROBOT_FPO_NAME
 )
 
 

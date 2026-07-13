@@ -15,7 +15,8 @@ from typing import List, Optional, TypeAlias
 import numpy as np  # type: ignore
 import FreeCAD as App  # type: ignore
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
+from freecad.Robot_tools.App.rbt_kine_types import (
+    ChainSpec, FIXED, PRISMATIC)
 from freecad.Robot_tools.backends.base import (
     placement_to_matrix4, matrix4_to_placement,
 )
@@ -39,6 +40,13 @@ def _rot4(axis: np.ndarray, q: float) -> np.ndarray:
     ])
 
 
+def _trans4(axis: np.ndarray, q: float) -> np.ndarray:
+    """4x4 translation of q [m] along a unit axis."""
+    M = np.eye(4)
+    M[0:3, 3] = axis * q
+    return M
+
+
 class NumpyDLSBackend:
     name: str = "numpy_dls"
 
@@ -58,23 +66,26 @@ class NumpyDLSBackend:
         self._steps = []
         for j in chain.joints:
             A = placement_to_matrix4(j.parent_to_joint)
-            if j.type == REVOLUTE:
-                ax = np.array([j.axis.x, j.axis.y, j.axis.z], dtype=float)
-                n = np.linalg.norm(ax)
-                if n < 1e-10:
-                    raise RuntimeError(f"Joint '{j.name}' has zero axis")
-                ax /= n
-                self._steps.append(
-                    (A, ax, (float(j.lim_low), float(j.lim_high))))
-            else:
-                self._steps.append((A, None, None))
+            if j.type == FIXED:
+                self._steps.append((A, None, None, False))
+                continue
+
+            ax = np.array([j.axis.x, j.axis.y, j.axis.z], dtype=float)
+            n = np.linalg.norm(ax)
+            if n < 1e-10:
+                raise RuntimeError(f"Joint '{j.name}' has zero axis")
+            ax /= n
+            self._steps.append(
+                (A, ax, (float(j.lim_low),
+                         float(j.lim_high)), j.type == PRISMATIC))
+
         self._F = placement_to_matrix4(chain.flange_local)
-        self._n_dof = sum(1 for _, ax, _ in self._steps if ax is not None)
+        self._n_dof = sum(1 for _, ax, _, _ in self._steps if ax is not None)
 
     def fk(self, q_rad: List[float]) -> Placement:
         assert self._chain is not None
-        T, _, _ = self._fk_jac_frames(np.asarray(q_rad, dtype=float))
-        return self._chain.base_world.multiply(matrix4_to_placement(T))
+        T, _, _, _ = self._fk_jac_frames(np.asarray(q_rad, dtype=float))
+        return self._chain.base_in_asm.multiply(matrix4_to_placement(T))
 
     def ik(
         self,
@@ -91,23 +102,24 @@ class NumpyDLSBackend:
                 f"{self._n_dof} DOF")
 
         # target into base-local meters (same convention as ikpy backend)
-        t_loc = self._chain.base_world.inverse().multiply(target)
+        t_loc = self._chain.base_in_asm.inverse().multiply(target)
         p_t = placement_to_matrix4(t_loc)[0:3, 3]
 
         q = np.asarray(q_seed_rad, dtype=float).copy()
         I3 = np.eye(3)
 
         for _ in range(max_iter):
-            T, zs, ps = self._fk_jac_frames(q)
+            T, zs, ps, prisms = self._fk_jac_frames(q)
             p_e = T[0:3, 3]
             e = p_t - p_e
             e_norm = np.linalg.norm(e)
             if e_norm < pos_tol:
                 return [float(v) for v in q]
 
-            # geometric Jacobian, position rows: J[:, i] = z_i × (p_e − p_i)
-            J = np.stack(
-                [np.cross(z, p_e - p) for z, p in zip(zs, ps)], axis=1)
+            # geometric Jacobian, position rows:
+            # revolute: z_i x (p_e - p_i) | prismatic: z_i
+            J = np.stack([z if pr else np.cross(z, p_e - p)
+                          for z, p, pr in zip(zs, ps, prisms)], axis=1)
 
             # adaptive damping: full λ while far (fast-drag safety near
             # singularities), shrinks with the error so the tight release
@@ -127,16 +139,18 @@ class NumpyDLSBackend:
             self._clamp_limits(q)
 
         # best-effort check after the final update
-        T, _, _ = self._fk_jac_frames(q)
+        T, _, _, _ = self._fk_jac_frames(q)
         if np.linalg.norm(p_t - T[0:3, 3]) < pos_tol:
             return [float(v) for v in q]
         return None
 
     def jacobian(self, q_rad: List[float]) -> Optional[np.ndarray]:
-        T, zs, ps = self._fk_jac_frames(np.asarray(q_rad, dtype=float))
+        T, zs, ps, prisms = self._fk_jac_frames(np.asarray(q_rad, dtype=float))
         p_e = T[0:3, 3]
-        Jp = np.stack([np.cross(z, p_e - p) for z, p in zip(zs, ps)], axis=1)
-        Jo = np.stack(zs, axis=1)
+        Jp = np.stack([z if pr else np.cross(z, p_e - p)
+                       for z, p, pr in zip(zs, ps, prisms)], axis=1)
+        Jo = np.stack([np.zeros(3) if pr else z
+                       for z, pr in zip(zs, prisms)], axis=1)
         return np.vstack([Jp, Jo])
 
     # ---- internals ----
@@ -147,21 +161,23 @@ class NumpyDLSBackend:
         z_i/p_i are sampled after A_i and before Rot(ax_i, q_i) — a
         rotation moves neither its own axis nor origin."""
         T = np.eye(4)
-        zs, ps = [], []
+        zs, ps, prisms = [], [], []
         k = 0
-        for A, ax, _ in self._steps:
+        for A, ax, _, prism in self._steps:
             T = T @ A
             if ax is not None:
                 zs.append(T[0:3, 0:3] @ ax)
                 ps.append(T[0:3, 3].copy())
-                T = T @ _rot4(ax, float(q[k]))
+                prisms.append(prism)
+                T = T @ (_trans4(ax, float(q[k])) if prism
+                         else _rot4(ax, float(q[k])))
                 k += 1
         T = T @ self._F
-        return T, zs, ps
+        return T, zs, ps, prisms
 
     def _clamp_limits(self, q: np.ndarray) -> None:
         k = 0
-        for _, ax, lim in self._steps:
+        for _, ax, lim, _ in self._steps:
             if ax is None:
                 continue
             lo, hi = lim

@@ -29,10 +29,12 @@ from freecad.Robot_tools.Gui.rbt_helpers_ui import (
 from freecad.Robot_tools.App.rbt_robot import is_robot
 
 from freecad.Robot_tools.App.rbt_kine import (
-    joint_limits_q_deg, set_q_deg, current_q_deg,
-    save_home, home_q_deg, joint_dirs
+    joint_limits_q_deg, curr_joint_vals_doc,
+    save_home, home_q_deg, joint_dirs, jog_q_deg,
+    resolve_offsets
 )
-
+from freecad.Robot_tools.App.rbt_kine_types import (
+    PRISMATIC, REVOLUTE, FIXED, joint_type_FC2WB)
 from freecad.Robot_tools.App.rbt_helpers_log import (
     fcl_err, fcl_msg)
 
@@ -48,13 +50,14 @@ VEC0 = V3(0, 0, 0)
 # ------------------------------------------------
 
 
-def create_link_row(dlg, gbx_l, row, fnt, jr, low, hi):
+def create_link_row(dlg, gbx_l, row, fnt, jr, low, hi, jtype):
     """
     Create a row of jog widgets for one joint.
     params:
         - jr : 1-based joint index
     """
     nm = f"{jr:02d}"
+    unit = " mm" if jtype == PRISMATIC else "°"
 
     # Col 0 : Joint label
     lbl_jnt = cm_lbl(dlg, f"lbl_jnt{nm}", f"Joint{nm}", fnt, 0)
@@ -66,7 +69,8 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, low, hi):
     gbx_l.addWidget(lbl_jnt, row, 0, 1, 1)
 
     # Col 1 : Angle Spinbox for manual edits
-    dspb_jnt = cm_dspb(dlg, f"dspb_jnt{nm}", fnt, sb_min=low, sb_max=hi)
+    dspb_jnt = cm_dspb(dlg, f"dspb_jnt{nm}", fnt, sb_min=low,
+                       sb_max=hi, sb_suf=unit)
     dspb_jnt.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
     gbx_l.addWidget(dspb_jnt, row, 1, 1, 1)
 
@@ -74,7 +78,7 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, low, hi):
 
     btn_jnt_m = cm_tool_btn(dlg, f"btn_jnt_m{nm}", "", fnt)
     btn_jnt_m.setArrowType(QtCore.Qt.LeftArrow)
-    btn_jnt_m.setToolTip(f"min: {low:g}°")
+    btn_jnt_m.setToolTip(f"min: {low:g}{unit}")
     btn_jnt_m.setFixedWidth(18)
     gbx_l.addWidget(btn_jnt_m, row, 3, 1, 1)
 
@@ -85,13 +89,19 @@ def create_link_row(dlg, gbx_l, row, fnt, jr, low, hi):
     # col 4 : Angle increasing nudger
     btn_jnt_p = cm_tool_btn(dlg, f"btn_jnt_p{nm}", "", fnt)
     btn_jnt_p.setArrowType(QtCore.Qt.RightArrow)
-    btn_jnt_p.setToolTip(f"max: {hi:g}°")
+    btn_jnt_p.setToolTip(f"max: {hi:g}{unit}")
     btn_jnt_p.setFixedWidth(18)
     gbx_l.addWidget(btn_jnt_p, row, 5, 1, 1)
 
     # col 6 — flip toggle (checked == reversed direction)
     chk_flip = cm_toggle(dlg, f"chk_flip{nm}", fnt)
     gbx_l.addWidget(chk_flip, row, 7, 1, 1)
+
+    # disable the fixed joints in the UI
+    if jtype == FIXED:
+        lbl_jnt.setToolTip("fixed joint (no DOF)")
+        for wd in (dspb_jnt, btn_jnt_m, sl_jnt, btn_jnt_p, chk_flip):
+            wd.setEnabled(False)
 
 # ---------------------------------------------
 #             App Layer
@@ -115,50 +125,61 @@ class AnimationController:
         """Checks joint limits before setting joint angles"""
         low, high = joint_limits_q_deg(self.robot, j_idx)
         value = max(low, min(high, value))
-        self.j_vals[j_idx] = value
-        set_q_deg(self.robot, j_idx, value)
+
+        q = curr_joint_vals_doc(self.robot)
+        q[j_idx] = value
+        self.j_vals = q
+
+        jog_q_deg(self.robot, q)
+
         return value
 
     def step_joint(self, j_idx, sign):
         """increment joint and return the value"""
-        # rebase on the document first as
-        # user may have moved the robot using
-        # ik drag since last update
-        self.j_vals[j_idx] = current_q_deg(self.robot)[j_idx]
         new_val = self.j_vals[j_idx] + sign * self.j_step
         self.j_vals[j_idx] = new_val
         self.set_joint_angle_clamped(j_idx, new_val)
         return new_val
 
+    def commit_joints(self):
+        """
+        write j_vals into Offset2
+        """
+        resolve_offsets(self.robot, self.j_vals)
+
     def go_home_pos(self):
         """Set home pos joint angle values"""
-        for idx, q in enumerate(home_q_deg(self.robot)):
-            # set the angles, in consideration of the joint directions
-            self.set_joint_angle_clamped(idx, q)
+        self.j_vals = list(home_q_deg(self.robot))
+        jog_q_deg(self.robot, self.j_vals)
+        self.commit_joints()
 
     def sync_joints_from_doc(self):
         """
         Re-read j_vals from document (Offset2)
         """
-        self.j_vals = list(current_q_deg(self.robot))
+        self.j_vals = list(curr_joint_vals_doc(self.robot))
 
     def reset_joints(self):
-        """reset joints to original val"""
-        asm = self.robot.Robot_assembly
-        if asm is None:
-            return
-
-        for n, jnt in enumerate(self.robot.Robot_joints):
-            jnt.Offset2 = Placement(VEC0, Rotation())
-            self.j_vals[n] = 0.0
-        asm.recompute()
+        """reset joints to null val"""
+        self.j_vals = [0.0] * self.j_num
+        jog_q_deg(self.robot, self.j_vals)
+        self.commit_joints()
 
     def set_initial_pose(self):
         """force apply offset2 with recompute-twice trick"""
         asm = self.robot.Robot_assembly
         for jnt in self.robot.Robot_joints:
+            jtype = joint_type_FC2WB(jnt.JointType)
+            if jtype == FIXED:
+                continue
+
             of2 = jnt.Offset2
-            jnt.Offset2 = Placement(VEC0, Rotation(1, 0, 0)).multiply(of2)
+            if jtype == PRISMATIC:
+                nudge = Placement(V3(0, 0, 1), Rotation())  # 1 mm
+            elif jtype == REVOLUTE:
+                nudge = Placement(VEC0, Rotation(1, 0, 0))  # 1 deg
+
+            jnt.Offset2 = nudge.multiply(of2)
             asm.recompute()
             jnt.Offset2 = of2
             asm.recompute()
@@ -229,7 +250,7 @@ class AnimationTaskPanel:
         lbl_h0 = cm_lbl(self.form, "lbl_h0", "<b>Axis</b>", self.fnt, 1)
         tp_gb0l.addWidget(lbl_h0, 0, 0, 1, 1)
 
-        lbl_h1 = cm_lbl(self.form, "lbl_h1", "<b>Angle</b>", self.fnt,
+        lbl_h1 = cm_lbl(self.form, "lbl_h1", "<b>Value</b>", self.fnt,
                         1, l_aln=1)
         tp_gb0l.addWidget(lbl_h1, 0, 1, 1, 1)
 
@@ -245,8 +266,9 @@ class AnimationTaskPanel:
         brow = 1
         for idx, jnm in enumerate(self.ctrl.j_nms):
             low, hi = joint_limits_q_deg(self.robot, idx)
+            jtype = joint_type_FC2WB(self.robot.Robot_joints[idx].JointType)
             create_link_row(self.form, tp_gb0l, brow, self.fnt,
-                            idx + 1, low, hi)
+                            idx + 1, low, hi, jtype)
             brow += 1
 
         # -- one row gap --
@@ -261,7 +283,9 @@ class AnimationTaskPanel:
 
         # entry box to set step size
         dspb_step = cm_dspb(self.form, "dspb_step", self.fnt,
-                            sb_min=0.01, sb_max=90.0, sb_dec=2, sb_step=0.1)
+                            sb_min=0.01, sb_max=90.0,
+                            sb_dec=2, sb_step=0.1, sb_suf="")
+        dspb_step.setToolTip("jog step in joint units (° | mm)")
         dspb_step.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
         dspb_step.setValue(self.ctrl.j_step)
         tb_lay.addWidget(dspb_step)
@@ -347,12 +371,14 @@ class AnimationTaskPanel:
             sl.blockSignals(False)
 
         # increment/decremnt buttons
+        jt = joint_type_FC2WB(self.robot.Robot_joints[j_idx].JointType)
+        unit = " mm" if jt == PRISMATIC else "°"
         bm = getObjByName(self.form, f"btn_jnt_m{nm}")
         if bm is not None:
-            bm.setToolTip(f"min: {low:g}°")
+            bm.setToolTip(f"min: {low:g}{unit}")
         bp = getObjByName(self.form, f"btn_jnt_p{nm}")
         if bp is not None:
-            bp.setToolTip(f"max: {hi:g}°")
+            bp.setToolTip(f"max: {hi:g}{unit}")
 
     def sync_panel_from_doc(self):
         """Pull joint state from the document into ctrl and the widgets."""
@@ -367,6 +393,7 @@ class AnimationTaskPanel:
     def _on_step(self, j_idx, sign):
         new_val = self.ctrl.step_joint(j_idx, sign)
         self.refresh_row(j_idx, new_val)
+        self.ctrl.commit_joints()
 
     def _on_reset_joints(self):
         self.ctrl.reset_joints()
@@ -374,6 +401,7 @@ class AnimationTaskPanel:
             self.refresh_row(j_n, 0.0)
 
     def _on_reload_dirs(self):
+        self.ctrl.commit_joints()
         dirs = joint_dirs(self.robot)
         for j_n in range(self.ctrl.j_num):
             ck = getObjByName(self.form, f"chk_flip{j_n+1:02d}")
@@ -394,8 +422,11 @@ class AnimationTaskPanel:
         sl = getObjByName(self.form, f"sl_jnt{j_idx + 1:02d}")
         new_val = self.ctrl.set_joint_angle_clamped(j_idx, raw / sl._scale)
         self.refresh_row(j_idx, new_val, skip="slider")
+        if not sl.isSliderDown():
+            self.ctrl.commit_joints()
 
     def _on_flip(self, j_idx, checked):
+        self.ctrl.commit_joints()
         dirs = joint_dirs(self.robot)
         dirs[j_idx] = -1 if checked else 1
 
@@ -409,12 +440,16 @@ class AnimationTaskPanel:
         self.ctrl.j_step = float(value)
 
     def _on_set_home(self):
+        self.ctrl.commit_joints()
         save_home(self.robot)
 
     def _on_go_home(self):
         self.ctrl.go_home_pos()
         for idx in range(self.ctrl.j_num):
             self.refresh_row(idx, self.ctrl.j_vals[idx])
+
+    def _on_commit(self, *_):
+        self.ctrl.commit_joints()
 
     # --------------------------------------------
     #           Robot state interface
@@ -464,10 +499,12 @@ class AnimationTaskPanel:
             nm = f"{j_n + 1:02d}"
             sb = getObjByName(p_wid, f"dspb_jnt{nm}")
             sb.valueChanged.connect(lambda v, idx=j_n: self._on_spin(idx, v))
+            sb.editingFinished.connect(self._on_commit)
 
             sl = getObjByName(p_wid, f"sl_jnt{nm}")
             sl.valueChanged.connect(lambda raw,
                                     idx=j_n: self._on_slider(idx, raw))
+            sl.sliderReleased.connect(self._on_commit)
 
             ck = getObjByName(p_wid, f"chk_flip{nm}")
             ck.setChecked(joint_dirs(self.robot)[j_n] == -1)
@@ -482,33 +519,40 @@ class AnimationTaskPanel:
 
     def reject(self):
         """Runs when user closes taskpanel"""
+        self.ctrl.commit_joints()
         Gui.Control.closeDialog()
         return True
     # --------------------------------------------
 
 
-def run():
-    sel = Gui.Selection.getSelection()
-    fnt = QApplication.font("QMessageBox")
-    if len(sel) != 1 \
-            or sel[0].TypeId != "App::FeaturePython" \
-            or not is_robot(sel[0]):
+def run(robot=None):
+    if robot is None:
+        sel = Gui.Selection.getSelection()
+        fnt = QApplication.font("QMessageBox")
+        if len(sel) != 1 \
+                or sel[0].TypeId != "App::FeaturePython" \
+                or not is_robot(sel[0]):
 
-        msg_box(Gui.getMainWindow(), "Robot", fnt,
-                "<b>Robot Selection</b>"
-                "<br><br>"
-                "You must selecta 'Robot_FPO' from the tree")
-        # fcl_err(f"sel:{str(len(sel))}, typeID:{sel[0].TypeId},
-        # name:{sel[0].Name}")
+            msg_box(Gui.getMainWindow(), "Robot", fnt,
+                    "<b>Robot Selection</b>"
+                    "<br><br>"
+                    "You must selecta 'Robot_FPO' from the tree")
+            # fcl_err(f"sel:{str(len(sel))}, typeID:{sel[0].TypeId},
+            # name:{sel[0].Name}")
+            return
+
+        if not hasattr(sel[0], "Robot_home_pos"):
+            msg_box(Gui.getMainWindow(), "Robot", fnt,
+                    "<b>Robot Missing Properties</b>"
+                    "<br><br>"
+                    "You must recreate 'Robot_FPO'")
+            return
+
+        # current user selected robot fpo
+        robot = sel[0]
+
+    if Gui.Control.activeDialog():
+        # skip if other dialogs are open
         return
 
-    if not hasattr(sel[0], "Robot_home_pos"):
-        msg_box(Gui.getMainWindow(), "Robot", fnt,
-                "<b>Robot Missing Properties</b>"
-                "<br><br>"
-                "You must recreate 'Robot_FPO'")
-        return
-
-    # sel[0] contains the robot fpo
-    panel = AnimationTaskPanel(sel[0])
-    Gui.Control.showDialog(panel)
+    Gui.Control.showDialog(AnimationTaskPanel(robot))

@@ -10,6 +10,8 @@ Licence: LGPL 2.1
 from freecad.Robot_tools.App.rbt_kine import invalidate
 from freecad.Robot_tools.App.rbt_kine_chain import joint_dirs
 from freecad.Robot_tools.App.rbt_global_constants import DEFAULT_KIN_LIB
+from freecad.Robot_tools.App.rbt_placement import (
+    ensure_sync_observer, push_base_placement, pull_base_placement)
 
 from freecad.Robot_tools.backends import KIN_LIB_NAMES
 
@@ -24,9 +26,9 @@ ROBOT_SCHEMA = [
     ("Robot_links", "App::PropertyPlacementList",
      "Robot", "Robot links list"),
     ("Robot_joints_dir", "App::PropertyIntegerList",
-     "Robot", "Joint direction CW/CCW"),
+     "Robot", "Joint direction sign (+1/-1) per joint"),
     ("Robot_home_pos", "App::PropertyFloatList",
-     "Robot", "Home position angles"),
+     "Robot", "Home position (revolute: deg, slider: mm)"),
 
     # tool handling properties
     ("Tools", "App::PropertyLinkListGlobal",
@@ -36,7 +38,14 @@ ROBOT_SCHEMA = [
 
     # kinematics lib properties
     ("Kinematics_lib", "App::PropertyEnumeration",
-     "Kinematics", "FK/IK solver")
+     "Kinematics", "FK/IK solver"),
+
+    # placement properties
+    ("Base_placement", "App::PropertyPlacement", "Placement",
+     "World -> robot base frame"),
+    ("Base_offset", "App::PropertyPlacement", "Placement",
+     "base frame in base-link coords "
+     "(moves the frame label, not the robot)"),
 ]
 
 
@@ -51,6 +60,7 @@ class Robot:
         obj.Kinematics_lib = KIN_LIB_NAMES
         obj.Kinematics_lib = DEFAULT_KIN_LIB
         obj.Proxy = self
+        ensure_sync_observer()
 
     def add_properties(self, obj):
         for name, ptype, group, doc in ROBOT_SCHEMA:
@@ -59,6 +69,19 @@ class Robot:
 
     def onChanged(self, obj, prop):
         '''Do something when a property has changed'''
+
+        if "Restore" in obj.State:
+            return
+
+        if prop == "Base_placement":
+            # whole assembly moves
+            push_base_placement(obj)
+            return
+
+        if prop == "Base_offset":
+            # asm stays, only frame moves
+            pull_base_placement(obj)
+
         if prop in ("Robot_joints", "Robot_joints_dir",
                     "Active_tool", "Kinematics_lib"):
             try:
@@ -72,6 +95,10 @@ class Robot:
         self.check_kin_libs(obj)
         self.check_joints_direction(obj)
         self.check_default_tool(obj)
+
+        # robot placement
+        ensure_sync_observer()
+        pull_base_placement(obj)  # migrates old docs
 
     def check_kin_libs(self, obj):
         """

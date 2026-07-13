@@ -27,7 +27,8 @@ from tesseract_robotics.tesseract_kinematics import (  # type: ignore
     KinGroupIKInputs,
 )
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
+from freecad.Robot_tools.App.rbt_kine_types import (
+    ChainSpec, REVOLUTE, PRISMATIC, FIXED)
 from freecad.Robot_tools.App.rbt_helpers_log import fcl_warn
 
 
@@ -102,7 +103,7 @@ class TesseractBackend:
         flange_in_base = _iso3_to_placement(
             self._kg.calcFwdKin(q)[self._tip_link]
         )
-        return self._chain.base_world.multiply(flange_in_base)
+        return self._chain.base_in_asm.multiply(flange_in_base)
 
     def ik(
         self,
@@ -113,7 +114,7 @@ class TesseractBackend:
         max_iter: int = 50,
     ) -> Optional[List[float]]:
         assert self._chain is not None and self._kg is not None
-        target_in_base = self._chain.base_world.inverse().multiply(target)
+        target_in_base = self._chain.base_in_asm.inverse().multiply(target)
         target_iso = _placement_to_iso3(target_in_base)
 
         ik_input = KinGroupIKInput()
@@ -212,7 +213,8 @@ def _chain_to_urdf_string(chain: ChainSpec, base_link: str) -> str:
         T = j.parent_to_joint
         xyz = (T.Base.x / MM_PER_M, T.Base.y / MM_PER_M, T.Base.z / MM_PER_M)
         rpy = _placement_to_rpy(T)
-        jtype = "revolute" if j.type == REVOLUTE else "fixed"
+        jtype = {REVOLUTE: "revolute",
+                 PRISMATIC: "prismatic"}.get(j.type, "fixed")
 
         j_str = f'  <joint name={quoteattr(j.name)} type={quoteattr(jtype)}>\n'
         l_str = f'    <parent link={quoteattr(parent_name)}/>\n'
@@ -224,7 +226,7 @@ def _chain_to_urdf_string(chain: ChainSpec, base_link: str) -> str:
             f'    <origin xyz="{xyz[0]:.9g} {xyz[1]:.9g} {xyz[2]:.9g}" '
             f'rpy="{rpy[0]:.9g} {rpy[1]:.9g} {rpy[2]:.9g}"/>\n'
         )
-        if jtype == "revolute":
+        if jtype != "fixed":
             ax = j.axis
             x, y, z = float(ax.x), float(ax.y), float(ax.z)
             a_str = f'<axis xyz="{x:.9g} {y:.9g} {z:.9g}"/>\n'

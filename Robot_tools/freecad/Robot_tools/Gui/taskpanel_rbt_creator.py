@@ -12,12 +12,13 @@ from PySide.QtWidgets import (  # type: ignore
 
 from freecad.Robot_tools.App.rbt_creator import RobotCreator
 from freecad.Robot_tools.App.rbt_creator_asm import find_assemblies
+
 from freecad.Robot_tools.Gui.rbt_fc_observer import (
     RbtObserver, RbtSelectionObserver)
 from freecad.Robot_tools.App.rbt_helpers_log import fcl_warn
 from freecad.Robot_tools.Gui.rbt_helpers_ui import (
     load_panel_ui, get_file, msg_box, set_txt_color)
-from freecad.Robot_tools.App.rbt_kine_types import REVOLUTE
+from freecad.Robot_tools.App.rbt_kine_types import REVOLUTE, PRISMATIC, FIXED
 
 # --------------------------------------------------------------
 
@@ -55,6 +56,9 @@ GUIDANCE = {
 }
 
 SHOWN_FC_TYPES = ("Part::Feature", "App::Part", "App::DocumentObjectGroup")
+
+JOINT_TYPE_CHOICES = {"Revolute": REVOLUTE, "Slider": PRISMATIC,
+                      "Fixed": FIXED}
 
 
 def _is_shown(obj):
@@ -141,6 +145,7 @@ class DefineRobot:
         self.grounded_check = w.groundedJointCheck
         self.joints_table = w.jointsTable
         self.status_label = w.statusLabel
+        self.joint_type_combo = w.jointTypeCombo
 
         # parts import from components file
         self.parts_list = w.partsList
@@ -409,30 +414,41 @@ class DefineRobot:
             return
 
         faces = list(self.pending_faces.values())
+        jtype = JOINT_TYPE_CHOICES.get(
+            self.joint_type_combo.currentText(), REVOLUTE)
+
         if len(faces) == 1:
             if not self.grounded_check.isChecked():
                 self.refresh_guidance(
-                    "Two faces are required for a revolute joint", "e")
+                    "two faces are required for a joint", "e")
                 return
 
-            # add grounded joint (fixed base joint)
-            self.creator.insert_joint("grounded",
-                                      [(faces[0]["obj"],
-                                        faces[0]["ref"])])
+            pick = (faces[0]["obj"], faces[0]["ref"])
+            self.creator.insert_base(jtype, pick,
+                                     label=f"rb_jnt{self.joint_index:02d}")
+            self.joint_index += 1
+
         else:
             # check if faces belong to different links
             if faces[0]["obj"] is faces[1]["obj"]:
                 self.refresh_guidance("Pick faces on two different links", "e")
                 return
-            # add revolute joint
+
             refs = [(faces[0]["obj"], faces[0]["ref"]),
                     (faces[1]["obj"], faces[1]["ref"])]
-            self.creator.insert_joint(REVOLUTE,
-                                      refs,
+
+            # pick order sanity check
+            # auto orient picks instead of trusting click order
+            prev_child = (self.creator.fpo.Robot_joints[-1].Reference2[0]
+                          if self.creator.fpo.Robot_joints
+                          else getattr(self.creator.grounded_joint(),
+                                       "ObjectToGround", None))
+            if prev_child is not None and refs[1][0] is prev_child:
+                refs = [refs[1], refs[0]]
+
+            self.creator.insert_joint(jtype, refs,
                                       label=f"rb_jnt{self.joint_index:02d}")
             self.joint_index += 1
-
-            # TODO: extend to prismatic & fixed joints
 
         self.refresh_joints_panel()
 
@@ -464,8 +480,10 @@ class DefineRobot:
             return
 
         grounded = self.creator.grounded_joint()
-        self.grounded_check.setEnabled(grounded is None)
-        self.grounded_check.setChecked(grounded is None)
+        has_base = (grounded is not None
+                    or self.creator.has_grounded_datum())
+        self.grounded_check.setEnabled(not has_base)
+        self.grounded_check.setChecked(not has_base)
         if grounded is not None:
             self.add_joint_row(["0", "grounded", "--", "--"],
                                grounded,
@@ -628,8 +646,10 @@ class DefineRobot:
             )
             return
 
+        has_base = (self.creator.grounded_joint() is not None
+                    or self.creator.has_grounded_datum())
         if self.curr_step == CreationStep.ADD_JOINTS:
-            if self.creator.grounded_joint() is None:
+            if not has_base:
                 text = """Pick one face on the base link, then
                         click 'Add Joint' to add it as ground link"""
             else:
@@ -678,6 +698,9 @@ class DefineRobot:
                 Robot needs a base (grounded) link and at least one joint.
                     """)
             return False
+
+        from freecad.Robot_tools.App.rbt_placement import pull_base_placement
+        pull_base_placement(self.creator.fpo)
 
         Gui.Selection.removeSelectionGate()
         self.teardown_observer()

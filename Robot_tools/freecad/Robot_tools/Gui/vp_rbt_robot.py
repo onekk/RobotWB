@@ -4,6 +4,10 @@ vp_rbt_robot.py - view provider for Robot FreeCAD python object (FPO)
 
 from pivy import coin  # type: ignore
 
+import FreeCADGui as Gui  # type: ignore
+from freecad.Robot_tools.App.rbt_placement import base_link
+from freecad.Robot_tools.App.rbt_helpers_log import fcl_err
+
 
 class ViewProviderRobot:
 
@@ -56,6 +60,23 @@ class ViewProviderRobot:
         kids.extend(getattr(obj, "Tools", []) or [])
         return kids
 
+    def doubleClicked(self, vobj):
+        from freecad.Robot_tools.Gui import taskpanel_rbt_animate
+        taskpanel_rbt_animate.run(vobj.Object)
+        return True
+
+    def setEdit(self, vobj, mode=0):
+        return self.doubleClicked(vobj)
+
+    def unsetEdit(self, vobj, mode=0):
+        Gui.Control.closeDialog()
+        return True
+
+    def setupContextMenu(self, vobj, menu):
+        act = menu.addAction("Place Robot (3D)")
+        act.triggered.connect(lambda:
+                              start_rbt_placement(vobj.Object))
+
     def onChanged(self, vp, prop):
         """
 
@@ -73,3 +94,27 @@ class ViewProviderRobot:
         Called during document restore.
         """
         return None
+
+
+# robot placement
+def start_rbt_placement(robot):
+    """
+    Using native transform dragger on the assembly
+    """
+    asm, bl = getattr(robot, "Robot_assembly", None), base_link(robot)
+
+    if asm is None or bl is None:
+        fcl_err("robot has no assembly or base link to move")
+        return
+
+    # another dialog open
+    if Gui.Control.activeDialog():
+        return
+
+    doc = Gui.getDocument(robot.Document.Name)
+    if doc.getInEdit():
+        doc.resetEdit()
+
+    # anchor the gizmo on base frame
+    asm.ViewObject.TransformOrigin = bl.Placement.multiply(robot.Base_offset)
+    doc.setEdit(asm.Name, 1)  # 1 = Transform mode

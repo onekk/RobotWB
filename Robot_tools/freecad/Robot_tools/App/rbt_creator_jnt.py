@@ -31,7 +31,8 @@ def add_joint(asm, jtype, refs, label=""):
     proxy = JointObject.Joint(j, JOINT_TYPES[jtype])
     JointObject.ViewProviderJoint(j.ViewObject)
     (o1, r1), (o2, r2) = refs[0], refs[1]
-    j.Reference1, j.Reference2 = find_center(o1, r1), find_center(o2, r2)
+    j.Reference1 = find_center(o1, r1, jtype)
+    j.Reference2 = find_center(o2, r2, jtype)
     proxy.preSolve(j, savePlc=False)
     # proxy.matchJCS(j, savePlc=False, reverse=proxy.areJcsSameDir(j))
     asm.Document.recompute()

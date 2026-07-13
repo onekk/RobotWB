@@ -104,6 +104,16 @@
         </property>
        </widget>
       </item>
+      <item row="0" column="2">
+       <widget class="QComboBox" name="jointTypeCombo">
+        <property name="toolTip">
+         <string>Type of joint to create from the two picked faces</string>
+        </property>
+        <item><property name="text"><string>Revolute</string></property></item>
+        <item><property name="text"><string>Slider</string></property></item>
+        <item><property name="text"><string>Fixed</string></property></item>
+       </widget>
+      </item>
       <item row="1" column="0">
        <widget class="QCheckBox" name="groundedJointCheck">
         <property name="text">

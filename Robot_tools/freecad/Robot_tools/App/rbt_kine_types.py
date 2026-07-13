@@ -22,7 +22,7 @@ PRISMATIC: JointType = "prismatic"
 FIXED: JointType = "fixed"
 
 # map name to Assembly JointType index
-JOINT_TYPES = {REVOLUTE: 1}
+JOINT_TYPES = {FIXED: 0, REVOLUTE: 1, PRISMATIC: 3}
 
 
 def joint_type_FC2WB(fc_jnt_name: str) -> JointType:
@@ -32,6 +32,8 @@ def joint_type_FC2WB(fc_jnt_name: str) -> JointType:
     """
     if fc_jnt_name == "Revolute":
         return REVOLUTE
+    if fc_jnt_name == "Slider":
+        return PRISMATIC
     else:
         return FIXED
 
@@ -84,12 +86,12 @@ class ChainSpec:
     """
     Base data class for kinematic chains.\n
     Contains:\n
-        - base_world: Placement of the base frame wrt world
+        - base_in_asm: Base link frame in Robot Assembly Coords
         - flange_local: TCP when tool is configured else last joint frame
         - links: List of links
         - joints: List of joints
     """
-    base_world: Placement  # world -> base
+    base_in_asm: Placement  # asm -> base
     flange_local: Placement  # last jnt frame -> flange
     links: List[LinkSpec]
     joints: List[JointSpec]

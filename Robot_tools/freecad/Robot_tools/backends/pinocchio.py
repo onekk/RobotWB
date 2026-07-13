@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING, List, Optional, TypeAlias
 
 import FreeCAD as App  # type: ignore
 
-from freecad.Robot_tools.App.rbt_kine_types import ChainSpec, REVOLUTE
+from freecad.Robot_tools.App.rbt_kine_types import (
+    ChainSpec, REVOLUTE, PRISMATIC, FIXED)
 from freecad.Robot_tools.backends.base import (
     placement_to_matrix4, matrix4_to_placement,
 )
@@ -72,17 +73,15 @@ class PinocchioBackend:
         pending = App.Placement()
 
         for j in chain.joints:
-            if j.type != REVOLUTE:
+            if j.type == FIXED:
                 pending = pending.multiply(j.parent_to_joint)
                 continue
-
             se3 = self._pl_to_se3(pending.multiply(j.parent_to_joint))
-
-            # empty the fix joints placement buffer
             pending = App.Placement()
-
             axis = np.array([j.axis.x, j.axis.y, j.axis.z], dtype=float)
-            jm = pin.JointModelRevoluteUnaligned(axis)
+            jm = (pin.JointModelPrismaticUnaligned(axis)
+                  if j.type == PRISMATIC
+                  else pin.JointModelRevoluteUnaligned(axis))
             jid = model.addJoint(parent_id, jm, se3, j.name)
             # joint indexing in model.{lower,upper}PositionLimit is 0-based for
             # joint_id minus 1 (joint 0 is the universe).
@@ -107,7 +106,7 @@ class PinocchioBackend:
         pin.forwardKinematics(self.model, self.data, q)
         pin.updateFramePlacements(self.model, self.data)
         ee_in_base = self._se3_to_pl(self.data.oMf[self.ee_frame_id])
-        return self.chain.base_world.multiply(ee_in_base)
+        return self.chain.base_in_asm.multiply(ee_in_base)
 
     def ik(
         self,
@@ -125,7 +124,7 @@ class PinocchioBackend:
         q = self._signed(q_seed_rad)
 
         # Move target into base-local (pin's "world" is the base joint).
-        target_in_base = self.chain.base_world.inverse().multiply(target)
+        target_in_base = self.chain.base_in_asm.inverse().multiply(target)
         oMdes = self._pl_to_se3(target_in_base)
 
         damp = 1e-6
@@ -158,7 +157,7 @@ class PinocchioBackend:
             # Respect limits (clamp on the manifold result)
             k = 0
             for js in self.chain.joints:
-                if js.type != REVOLUTE:
+                if js.type == FIXED:
                     continue
                 q[k] = max(js.lim_low, min(js.lim_high, q[k]))
                 k += 1
